@@ -1,3 +1,12 @@
+/**
+  * MD - Résumé :
+  *
+  * Ce programme permet au robot de communiquer avec l'odomètre (pour déterminer
+  * s'il est statique ou non selon sa distance parcourue)
+  * ainsi que le noeud moving person detector (lui indique qu'il bouge)
+  */
+
+
 // Signal handling
 #include <signal.h>
 
@@ -45,7 +54,7 @@ public:
 robot_moving_node() {
 
     // communication with person_detector
-    pub_robot_moving = n.advertise<std_msgs::Bool>("robot_moving", 1);   
+    pub_robot_moving = n.advertise<std_msgs::Bool>("robot_moving", 1);
 
     // communication with odometry
     sub_odometry = n.subscribe("odom", 1, &robot_moving_node::odomCallback, this);
@@ -121,5 +130,3 @@ int main(int argc, char **argv) {
     return 0;
 
 }
-
-

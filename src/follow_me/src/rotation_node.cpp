@@ -15,7 +15,7 @@
 #define ki 0
 #define kd 0
 
-class rotation {
+class rotation_action {
 private:
 
     ros::NodeHandle n;
@@ -42,26 +42,22 @@ private:
     float error_integral;
     float error_previous;
 
-    bool init_odom;
-    bool display_odom;
-
 public:
 
-rotation() {
+rotation_action() {
 
     // communication with cmd_vel to command the mobile robot
     pub_cmd_vel = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
 
     // communication with odometry
-    sub_odometry = n.subscribe("odom", 1, &rotation::odomCallback, this);
+    sub_odometry = n.subscribe("odom", 1, &rotation_action::odomCallback, this);
     cond_rotation = false;
     new_rotation_to_do = false;
-    init_odom = false;
-    display_odom = false;
+    new_odom = false;
 
     // communication with decision
     pub_rotation_done = n.advertise<std_msgs::Float32>("rotation_done", 1);
-    sub_rotation_to_do = n.subscribe("rotation_to_do", 1, &rotation::rotation_to_doCallback, this);//this is the rotation that has to be performed
+    sub_rotation_to_do = n.subscribe("rotation_to_do", 1, &rotation_action::rotation_to_doCallback, this);//this is the rotation that has to be performed
 
     error_integral = 0;
     error_previous = 0;
@@ -82,10 +78,18 @@ rotation() {
 void update() {
 
     // we receive a new /rotation_to_do
-    if ( new_rotation_to_do && init_odom ) {
+    /**
+      * MD - Ce programme permet d'effectuer une rotation
+      * S'effectue uniquement lorsqu'elle a été publiée (souscription à rotation to do)
+      */
+    if ( new_rotation_to_do && new_odom ) {
+      /**
+        * On initialise la rotation à effectuer
+        * On n'effectue qu'une seule rotation à la fois
+        */
         new_rotation_to_do = false;
-        ROS_INFO("\n(rotation_node) processing the /rotation_to_do received from the decision node");
-        ROS_INFO("(rotation_node) rotation_to_do: %f", rotation_to_do*180/M_PI);
+        ROS_INFO("\n(rotation_action_node) processing the /rotation_to_do received from the decision node");
+        ROS_INFO("(rotation_action_node) rotation_to_do: %f", rotation_to_do*180/M_PI);
 
         init_orientation = current_orientation;
         rotation_done = current_orientation;
@@ -97,19 +101,20 @@ void update() {
             rotation_to_do -= 2*M_PI;
         if ( rotation_to_do < -M_PI )
             rotation_to_do += 2*M_PI;
+
     }
     //we are performing a rotation
-    if ( init_odom && cond_rotation ) {
+    if ( new_odom && cond_rotation ) {
         rotation_done = current_orientation;
         float error = ( rotation_to_do - rotation_done );
 
         if ( error > M_PI ) {
-            ROS_WARN("(rotation node) error > 180 degrees: %f degrees -> %f degrees", error*180/M_PI, (error-2*M_PI)*180/M_PI);
+            ROS_WARN("(rotation_action node) error > 180 degrees: %f degrees -> %f degrees", error*180/M_PI, (error-2*M_PI)*180/M_PI);
             error -= 2*M_PI;
         }
         else
             if ( error < -M_PI ) {
-                ROS_WARN("(rotation node) error < -180 degrees: %f degrees -> %f degrees", error*180/M_PI, (error+2*M_PI)*180/M_PI);
+                ROS_WARN("(rotation_action node) error < -180 degrees: %f degrees -> %f degrees", error*180/M_PI, (error+2*M_PI)*180/M_PI);
                 error += 2*M_PI;
             }
 
@@ -117,22 +122,36 @@ void update() {
 
         float rotation_speed = 0;
         if ( cond_rotation ) {
+          /**
+            * MD - Implémentation du PID de la rotation
+            *  P (Régulateur Proportionnel) : kp * error
+            *  I (Régulateur Intégral)      : ki * error_integral
+            *  D (Régulateur dérivé)        : kd * error_derivation;
+            *
+            */
             //TO COMPLETE
             //Implementation of a PID controller for rotation_to_do;
             //rotation_speed = kp*error + ki * error + kp * error_derivation;
 
-            float error_derivation;//To complete
-            //ROS_INFO("error_derivaion: %f", error_derivation);
+            /**
+              * MD - error_derivation = Différence entre les deux dernières erreurs
+              */
+            float error_derivation = error + error_previous;
+            ROS_INFO("error_derivaion: %f", error_derivation);
 
-            //error_integral = ...;//To complete
-            //ROS_INFO("error_integral: %f", error_integral);
+            /**
+              * MD -  error_integral = Somme des erreurs
+              */
+            error_integral += error;
+            ROS_INFO("error_integral: %f", error_integral);
 
             //control of rotation with a PID controller
+
             rotation_speed = kp * error + ki * error_integral + kd * error_derivation;
-            ROS_INFO("(rotation_node) current_orientation: %f, orientation_to_reach: %f -> rotation_speed: %f", rotation_done*180/M_PI, rotation_to_do*180/M_PI, rotation_speed*180/M_PI);
+            ROS_INFO("(rotation_action_node) current_orientation: %f, orientation_to_reach: %f -> rotation_speed: %f", rotation_done*180/M_PI, rotation_to_do*180/M_PI, rotation_speed*180/M_PI);
         }
         else {
-            ROS_INFO("(rotation_node) current_orientation: %f, orientation_to_reach: %f -> rotation_speed: %f", rotation_done*180/M_PI, rotation_to_do*180/M_PI, rotation_speed*180/M_PI);
+            ROS_INFO("(rotation_action_node) current_orientation: %f, orientation_to_reach: %f -> rotation_speed: %f", rotation_done*180/M_PI, rotation_to_do*180/M_PI, rotation_speed*180/M_PI);
             rotation_done -= init_orientation;
 
             if ( rotation_done > M_PI )
@@ -140,8 +159,8 @@ void update() {
             if ( rotation_done < -M_PI )
                 rotation_done += 2*M_PI;
 
-            ROS_INFO("(rotation_node) final rotation_done: %f", rotation_done*180/M_PI);
-            ROS_INFO("(rotation_node) waiting for a /rotation_to_do");
+            ROS_INFO("(rotation_action_node) final rotation_done: %f", rotation_done*180/M_PI);
+            ROS_INFO("(rotation_action_node) waiting for a /rotation_to_do");
 
             std_msgs::Float32 msg_rotation_done;
             msg_rotation_done.data = rotation_done;
@@ -158,17 +177,9 @@ void update() {
         twist.angular.z = rotation_speed;
 
         pub_cmd_vel.publish(twist);
-    }
 
-    //DISPLAY MSGS
-    if ( !display_odom && !init_odom ) {
-        ROS_INFO("wait for odom");
-        display_odom = true;
     }
-    if ( display_odom && init_odom )  {
-        ROS_INFO("odom is ok");
-        display_odom = false;
-    }
+    new_odom = false;
 
 }// update
 
@@ -177,7 +188,7 @@ void update() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 void odomCallback(const nav_msgs::Odometry::ConstPtr& o) {
 
-    init_odom = true;
+    new_odom = true;
     current_orientation = tf::getYaw(o->pose.pose.orientation);
 
 }
@@ -193,10 +204,10 @@ void rotation_to_doCallback(const std_msgs::Float32::ConstPtr & a) {
 
 int main(int argc, char **argv){
 
-    ros::init(argc, argv, "rotation");
+    ros::init(argc, argv, "rotation_action");
 
-    ROS_INFO("(rotation_node) waiting for a /rotation_to_do");
-    rotation bsObject;
+    ROS_INFO("(rotation_action_node) waiting for a /rotation_to_do");
+    rotation_action bsObject;
 
     ros::spin();
 

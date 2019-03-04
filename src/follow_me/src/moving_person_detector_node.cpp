@@ -1,6 +1,16 @@
 // moving persons detector using lidar data
 // written by O. Aycard
 
+/**
+  * MD -
+  * Résumé du programme :
+  * 1- Détection mouvements de l'environnement (comparaison avant/après)
+  * 2- Création + config des clusters (id, taille, centre, % points dynamiques, coloration, nombre..)
+  * 3- Détection des jambes (filtrage clusters qui correspondent à des jambes)
+  * 4- Détection des personnes (comparaison des jambes) + publication goal_to_reach
+  *
+  */
+
 #include "ros/ros.h"
 #include "ros/time.h"
 #include "sensor_msgs/LaserScan.h"
@@ -171,6 +181,11 @@ void update() {
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 void store_background() {
+
+  /**
+    * MD : Permet de stocker le balayage laser précédent
+    * Nécessaire pour comparer s'il y a un mouvement au prochain balayage laser
+    */
 // store all the hits of the laser in the background table
 
     ROS_INFO("storing background");
@@ -184,7 +199,13 @@ void store_background() {
 
 void detect_motion() {
 
+    /** MD :
+      * Phase de détection de mouvement
+      * Permet de vérifier si un élément de l'environnement a bougé (cmp background (précédent) range (courant))
+      * Résultat stocké dans tableau "dynamic" (1000 entrées - val : 0 (statique) | 1 : mouvement détecté)
+      */
     ROS_INFO("detecting motion");
+
 
     for (int loop=0; loop<nb_beams; loop++ ){//loop over all the hits
         //if the difference between ( the background and the current value ) is higher than "detection_threshold"
@@ -203,6 +224,11 @@ void detect_motion() {
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 void perform_clustering() {
+  /**
+    * MD : Permet de constituer les groupes de points (cluster)
+    * Premier point cluster : vert (initialisation)
+    * Dernier point cluster : rouge (lorsque seuil dépassé)
+    */
 //store in the table cluster, the cluster of each hit of the laser
 //if the distance between the previous hit and the current one is lower than "cluster_threshold"
 //then the current hit belongs to the current cluster
@@ -218,6 +244,10 @@ void perform_clustering() {
     int nb_dynamic = 0;// to count the number of hits of the current cluster that are dynamic
 
     //graphical display of the start of the current cluster in green
+
+    /**
+      * MD : Point vert = début du cluster
+      */
     display[nb_pts].x = current_scan[cluster_start[nb_cluster]].x;
     display[nb_pts].y = current_scan[cluster_start[nb_cluster]].y;
     display[nb_pts].z = current_scan[cluster_start[nb_cluster]].z;
@@ -228,34 +258,79 @@ void perform_clustering() {
     colors[nb_pts].a = 1.0;
     nb_pts++;
 
+    /**
+      * MD : Permet de stocker les groupes de cluster
+      * Ex : cluster[0] = 0 ; cluster[1] = 0 ; cluster[2] = 0 ; cluster[3] = 1
+      * Il a le cluster 0 (resp 1) qui contient 3 points (resp 1 point)
+      */
     for( int loop=1; loop<nb_beams; loop++ )//loop over all the hits
         //if distance between (the previous hit and the current one) is lower than "cluster_threshold"
+
+        /**
+          * MD - Point supplémentaire pour ce cluster
+          */
         if (distancePoints(current_scan[loop-1],current_scan[loop])< cluster_threshold){
             cluster[loop]=nb_cluster;   //the current hit belongs to the current cluster
+            /**
+              * MD : Compte le nombre de Point dynamique (tab dynamic initialisé par méthode detect_motion)
+              * Réinitialisé à chaque nouveau cluster
+              */
             if (dynamic[loop]==1)
             {
                 nb_dynamic++;
             }
         }
 
+        /**
+          * MD - Seuil dépassé, on termine donc le cluster précédent et on
+          * en créé un nouveau à partir du point actuel
+          */
         else {//the current hit doesnt belong to the same hit
               /*1/ we end the current cluster, so we update:
               - cluster-end to store the last hit of the current cluster
               - cluster_dynamic to store the percentage of hits of the current cluster that are dynamic
               - cluster_size to store the size of the cluster ie, the distance between the first hit of the cluster and the last one
               - cluster_middle to store the middle of the cluster*/
+
+          /**
+            * MD - cluster_end : Tableau où l'on stocke le dernier point de chaque cluster
+            *       Indice = n°grp cluster
+            *      Valeur = n°dernier point
+            */
             cluster_end[nb_cluster]=loop-1;
+            /**
+              * MD - cluster_dynamic : Tableau où l'on stocke le % de points dynamiques de chaque
+              *      cluster
+              *      Indice = n°grp cluster
+              *      Valeur = % points dynamiques
+              */
             if (loop-cluster_start[nb_cluster] > 0) {
 
               cluster_dynamic[nb_cluster] = (nb_dynamic/(loop-cluster_start[nb_cluster]))*100;
             }else{
                 cluster_dynamic[nb_cluster] =0;
             }
+            /**
+              * MD - cluster_size : Tableau où l'on stocke la distance entre le
+              *      premier et le dernier point de chaque cluster
+              *      Indice = n°grp cluster
+              *      Valeur = distance entre les extrémités du cluster
+              */
             cluster_size[nb_cluster]=distancePoints(current_scan[cluster_end[nb_cluster]],current_scan[cluster_start[nb_cluster]]);
+
+            /**
+              * MD - cluster_middle : Tableau où l'on stocke la coordonnée x et y
+              *      moyenne du cluster
+              *      Indice = n°grp cluster
+              *      Valeur = Point au centre du cluster
+              */
             cluster_middle[nb_cluster].x= (current_scan[cluster_start[nb_cluster]].x + current_scan[cluster_end[nb_cluster]].x)/2;
             cluster_middle[nb_cluster].y= (current_scan[cluster_start[nb_cluster]].y + current_scan[cluster_end[nb_cluster]].y)/2;
 
             //graphical display of the end of the current cluster in red
+            /**
+              * MD : Point rouge = fin du cluster
+              */
             display[nb_pts].x = current_scan[cluster_end[nb_cluster]].x;
             display[nb_pts].y = current_scan[cluster_end[nb_cluster]].y;
             display[nb_pts].z = current_scan[cluster_end[nb_cluster]].z;
@@ -270,6 +345,9 @@ void perform_clustering() {
             ROS_INFO("cluster[%i]: [%i](%f, %f) -> [%i](%f, %f), size: %f, dynamic: %i", nb_cluster, cluster_start[nb_cluster], current_scan[cluster_start[nb_cluster]].x, current_scan[cluster_start[nb_cluster]].y, cluster_end[nb_cluster], current_scan[cluster_end[nb_cluster]].x, current_scan[cluster_end[nb_cluster]].y, cluster_size[nb_cluster], cluster_dynamic[nb_cluster]);
 
             //2/ we starta new cluster with the current hit
+            /**
+              * MD - Début du nouveau cluster (similaire à init premier cluster cf début méthode)
+              */
             nb_dynamic = 0;// to count the number of hits of the current cluster that are dynamic
             nb_cluster++;
             cluster_start[nb_cluster] = loop;
@@ -320,16 +398,32 @@ void detect_moving_legs() {
     ROS_INFO("detecting moving legs");
     nb_moving_legs_detected = 0;
 
+    /**
+      * MD - On parcourt chaque cluster (données fournies par méthode perform_clustering)
+      * S'il correspond aux critères pour en faire une jambe i.e satisfait la taille d'une jambe
+      * et possède au moins 75% de points dynamiques
+      */
     for (int loop=0; loop<nb_cluster; loop++){//loop over all the clusters
         //if the size of the current cluster is higher than "leg_size_min" and lower than "leg_size_max" and it has "dynamic_threshold"% of its hits that are dynamic
         //then the current cluster is a moving leg
+
+        /**
+          * MD - Si le cluster correspond à une jambe en mouvement
+          */
         if (cluster_size[loop] > leg_size_min && cluster_size[loop] < leg_size_max && cluster_dynamic[loop] >= dynamic_threshold ){
             // we update the moving_leg_detected table to store the middle of the moving leg
             nb_moving_legs_detected++;
+            /**
+              * MD - On l'ajoute au tableau nb_moving_legs_detected
+              *      Index : Nombre de jambe
+              *      Valeur : Point moyen du cluster actuel (milieu = position jambe)
+              */
             moving_leg_detected[nb_moving_legs_detected] =cluster_middle[loop];
             //textual display
             ROS_INFO("moving leg detected[%i]: cluster[%i]", nb_moving_legs_detected, loop);
-
+            /**
+              * MD - Affichage de toutes les jambes en mouvement détectées
+              */
             //graphical display
             for(int loop2=cluster_start[loop]; loop2<=cluster_end[loop]; loop2++) {
                 // moving legs are white
@@ -359,6 +453,15 @@ void detect_moving_persons() {
     ROS_INFO("detecting moving persons");
     nb_moving_persons_detected = 0;
 
+    /**
+      * MD : Pour détecter les personnes :
+      * On parcourt pour chaque jambe toutes les autres jambes en mouvement détectées (tableau moving_leg_detected
+      * de la méthode detect_moving_legs)
+      * Si deux jambes correspondent à une personne (distance < seuil)
+      * On l'ajoute au tableau moving_persons_detected
+      *
+      * IMPORTANT : la personne détectée = goal_to_reach
+      */
     for (int loop_leg1=0; loop_leg1<nb_moving_legs_detected; loop_leg1++){//loop over all the legs
         for (int loop_leg2=loop_leg1+1; loop_leg2<nb_moving_legs_detected; loop_leg2++){//loop over all the legs
             //if the distance between two moving legs is lower than "legs_distance_max"

@@ -8,6 +8,31 @@
 #include <cmath>
 #include <tf/transform_datatypes.h>
 
+/**
+  * MD - Ce programme permet de gérer l'aspect décisionnel du follow_me
+  * S'effectue sous forme d'automate à 3 états
+  *
+  * Etat 1 : Attente du message goal_to_reach (lorsque programme moving_persons_detector_node
+  *          Repère une personne, publie ce message)
+  * - Calcul de rotation_to_do et translation_to_do grâce aux coordonnées de la personne (x,y)
+  *   et aux formules fournies (coord. polaires).
+  * - Publication de la rotation_to_do
+  * - Entrée dans l'état 2 (attente de la fin de la rotation effectuée par programme rotation_node)
+  *
+  *
+  * Etat 2 :  Attente du message rotation_done (lorsque programme rotation_node
+  *           a terminé la rotation, publie ce message)
+  * - Publication de la translation_to_do
+  * - Entrée dans l'état 3 (attente de la fin de la translation effectuée par programme translation_node)
+  *
+  *
+  * Etat 3 :  Attente du message translation_done (lorsque programme translation_node
+  *           a terminé la translation, publie ce message)
+  *
+  * - Publication du goal_reached
+  * - Retour a l'état 1
+  *
+  */
 class decision {
 private:
 
@@ -83,6 +108,10 @@ void update() {
     }
 
     // we receive a new /goal_to_reach and robair is not doing a translation or a rotation
+    /**
+      * MD - Etat 1
+      */
+
     if ( ( new_goal_to_reach ) && ( state == 1 ) ) {
 
         ROS_INFO("(decision_node) /goal_to_reach received: (%f, %f)", goal_to_reach.x, goal_to_reach.y);
@@ -90,6 +119,9 @@ void update() {
 
         // we have a rotation and a translation to perform
         // we compute the /translation_to_do
+        /**
+          * MD - 1.1 Calcul de la rotation/translation
+          */
         translation_to_do = sqrt( ( goal_to_reach.x * goal_to_reach.x ) + ( goal_to_reach.y * goal_to_reach.y ) );
 
         if ( translation_to_do ) {
@@ -103,8 +135,17 @@ void update() {
             //we first perform the /rotation_to_do
             ROS_INFO("(decision_node) /rotation_to_do: %f", rotation_to_do*180/M_PI);
             std_msgs::Float32 msg_rotation_to_do;
-            msg_rotation_to_do.data=rotation_to_do;
-            pub_rotation_to_do.publish(msg_rotation_to_do);
+            //to complete
+            /**
+              * MD - 1.2 Publication de la rotation_to_do
+              */
+              msg_rotation_to_do.data = rotation_to_do;
+              pub_rotation_to_do.publish(msg_rotation_to_do);
+              /**
+                * MD - Passage dans l'état 2 (attente fin rotation)
+                */
+              state = 2;
+
 
         }
         else {
@@ -118,6 +159,9 @@ void update() {
     }
 
     //we receive an ack from rotation_action_node. So, we perform the /translation_to_do
+    /**
+      * MD - Etat 2
+      */
     if ( ( new_rotation_done ) && ( state == 2 ) ) {
         ROS_INFO("(decision_node) /rotation_done : %f", rotation_done*180/M_PI);
         new_rotation_done = false;
@@ -126,11 +170,23 @@ void update() {
         //the rotation_to_do is done so we perform the translation_to_do
         ROS_INFO("(decision_node) /translation_to_do: %f", translation_to_do);
         std_msgs::Float32 msg_translation_to_do;
-        msg_translation_to_do.data=translation_to_do;
-        pub_translation_to_do.publish(msg_translation_to_do);
+        //to complete
+        /**
+          * MD - 2.1 Publication de la translation_to_do
+          */
+
+          msg_translation_to_do.data = translation_to_do;
+          pub_translation_to_do.publish(msg_translation_to_do);
+          /**
+            * MD - Passage dans l'état 2 (attente fin rotation)
+            */
+          state = 3;
     }
 
     //we receive an ack from translation_action_node. So, we send an ack to the moving_persons_detector_node
+    /**
+      * MD - Etat 3
+      */
     if ( ( new_translation_done ) && ( state == 3 ) ) {
         ROS_INFO("(decision_node) /translation_done : %f\n", translation_done);
         new_translation_done = false;
@@ -139,9 +195,21 @@ void update() {
         //the translation_to_do is done so we send the goal_reached to the detector/tracker node
         geometry_msgs::Point msg_goal_reached;
         ROS_INFO("(decision_node) /goal_reached (%f, %f)", msg_goal_reached.x, msg_goal_reached.y);
-        msg_goal_reached.data=goal_reached;
+        //to complete
+
+        /**
+          * MD - 3.1 Publication de la destination atteinte
+          * //TODO Si ne fonctionne pas, remplacer msg_goal_reached par goal_reached
+          */
+        msg_goal_reached.x = goal_reached.x;
+        msg_goal_reached.y = goal_reached.y;
         pub_goal_reached.publish(msg_goal_reached);
 
+        /**
+          * MD - 3.2 retour à l'état initial (en attente de goal to reach)
+          */
+
+        state = 1;
         ROS_INFO(" ");
         ROS_INFO("(decision_node) waiting for a /goal_to_reach");
     }
