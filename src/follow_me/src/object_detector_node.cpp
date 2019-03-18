@@ -42,6 +42,7 @@ private:
 
     ros::Subscriber sub_scan;
     ros::Subscriber sub_robot_moving;
+sudo chmod a+rw /dev/ttyACM0
 
     ros::Publisher pub_moving_persons_detector;
     ros::Publisher pub_moving_persons_detector_marker;
@@ -105,7 +106,8 @@ moving_persons_detector() {
     current_robot_moving = true;
     init_laser = false;
     init_robot = false;
-    display_laser = false;
+    display_laser = false;sudo chmod a+rw /dev/ttyACM0
+
     display_robot = false;
 
     //INFINTE LOOP TO COLLECT LASER DATA AND PROCESS THEM
@@ -141,17 +143,17 @@ void update() {
                 store_background();
 
             //we search for moving persons in 4 steps
-            detect_motion();//to classify each hit of the laser as dynamic or not
+            //detect_motion();//to classify each hit of the laser as dynamic or not
             perform_clustering();//to perform clustering
-            detect_moving_legs();//to detect moving legs using cluster
-            detect_moving_persons();//to detect moving_persons using moving legs detected
+            detect_object();//to detect objects using cluster
+            //detect_moving_persons();//to detect moving_persons using moving legs detected
 
             //graphical display of the results
             populateMarkerTopic();
 
             //to publish the goal_to_reach
-            if ( nb_moving_persons_detected )
-                pub_moving_persons_detector.publish(goal_to_reach);
+            //if ( nb_moving_persons_detected )
+            //    pub_moving_persons_detector.publish(goal_to_reach);
         }
         else
             ROS_INFO("robot is moving");
@@ -442,9 +444,9 @@ void detect_object() {
         }
     }
     if ( nb_object_detected )
-        ROS_INFO("%d moving legs have been detected.\n", nb_object_detected);
+        ROS_INFO("%d objects have been detected.\n", nb_object_detected);
 
-    ROS_INFO("moving legs detected");
+    ROS_INFO("objects detected");
 
 }//detect_moving_legs
 
