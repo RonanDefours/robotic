@@ -67,7 +67,8 @@ private:
 
     //to perform detection of moving legs and to store them
     int nb_object_detected;
-    geometry_msgs::Point moving_leg_detected[1000];// to store the middle of each moving leg
+    geometry_msgs::Point object_detected[1000];// to store the middle of each moving leg
+    int id_object_detected [1000];
 
     //to perform detection of moving person and store them
     int nb_moving_persons_detected;
@@ -410,16 +411,17 @@ void detect_object() {
           * MD - Si le cluster correspond à une jambe en mouvement
           */
         if (cluster_size[loop] > object_size_min && cluster_size[loop] < object_size_max){
-            // we update the moving_leg_detected table to store the middle of the moving leg
+            // we update the object_detected table to store the middle of the moving leg
             nb_object_detected++;
             /**
               * MD - On l'ajoute au tableau nb_object_detected
               *      Index : Nombre de jambe
               *      Valeur : Point moyen du cluster actuel (milieu = position jambe)
               */
-            moving_leg_detected[nb_object_detected] =cluster_middle[loop];
+            object_detected[nb_object_detected] =cluster_middle[loop];
+            id_object_detected[nb_object_detected]= loop;
             //textual display
-            ROS_INFO("moving leg detected[%i]: cluster[%i]", nb_object_detected, loop);
+            ROS_INFO("object detected[%i]: cluster[%i]", nb_object_detected, loop);
             /**
               * MD - Affichage de toutes les jambes en mouvement détectées
               */
@@ -454,7 +456,7 @@ void detect_circular_object() {
 
     /**
       * MD : Pour détecter les personnes :
-      * On parcourt pour chaque jambe toutes les autres jambes en mouvement détectées (tableau moving_leg_detected
+      * On parcourt pour chaque jambe toutes les autres jambes en mouvement détectées (tableau object_detected
       * de la méthode detect_moving_legs)
       * Si deux jambes correspondent à une personne (distance < seuil)
       * On l'ajoute au tableau moving_persons_detected
@@ -465,12 +467,12 @@ void detect_circular_object() {
         for (int loop_leg2=loop_leg1+1; loop_leg2<nb_object_detected; loop_leg2++){//loop over all the legs
             //if the distance between two moving legs is lower than "legs_distance_max"
             //then we find a moving person
-            if (distancePoints(moving_leg_detected[loop_leg1],moving_leg_detected[loop_leg2]) <legs_distance_max)
+            if (distancePoints(object_detected[loop_leg1],object_detected[loop_leg2]) <legs_distance_max)
             {
 
                 nb_moving_persons_detected++;
-                moving_persons_detected[nb_moving_persons_detected].x = (moving_leg_detected[loop_leg1].x+moving_leg_detected[loop_leg2].x)/2;
-                moving_persons_detected[nb_moving_persons_detected].y = (moving_leg_detected[loop_leg1].y+moving_leg_detected[loop_leg2].y)/2;
+                moving_persons_detected[nb_moving_persons_detected].x = (object_detected[loop_leg1].x+object_detected[loop_leg2].x)/2;
+                moving_persons_detected[nb_moving_persons_detected].y = (object_detected[loop_leg1].y+object_detected[loop_leg2].y)/2;
             // we update the moving_persons_detected table to store the middle of the moving person
 
             // textual display
