@@ -1,8 +1,8 @@
-prefix=/home/ronan/catkin_ws/devel
+prefix=/home/ronan/Documents/robotic/devel
 
 Name: follow_me
 Description: Description of follow_me
 Version: 0.0.0
 Cflags: 
-Libs: -L/home/ronan/catkin_ws/devel/lib 
+Libs: -L/home/ronan/Documents/robotic/devel/lib 
 Requires: 

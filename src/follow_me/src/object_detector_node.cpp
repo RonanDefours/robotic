@@ -35,14 +35,14 @@
 
 using namespace std;
 
-class moving_persons_detector {
+class object_detector_node {
 
 private:
     ros::NodeHandle n;
 
     ros::Subscriber sub_scan;
     ros::Subscriber sub_robot_moving;
-sudo chmod a+rw /dev/ttyACM0
+
 
     ros::Publisher pub_moving_persons_detector;
     ros::Publisher pub_moving_persons_detector_marker;
@@ -95,10 +95,10 @@ sudo chmod a+rw /dev/ttyACM0
 
 public:
 
-moving_persons_detector() {
+object_detector_node() {
 
-    sub_scan = n.subscribe("scan", 1, &moving_persons_detector::scanCallback, this);
-    sub_robot_moving = n.subscribe("robot_moving", 1, &moving_persons_detector::robot_movingCallback, this);
+    sub_scan = n.subscribe("scan", 1, &object_detector_node::scanCallback, this);
+    sub_robot_moving = n.subscribe("robot_moving", 1, &object_detector_node::robot_movingCallback, this);
 
     pub_moving_persons_detector_marker = n.advertise<visualization_msgs::Marker>("moving_person_detector", 1); // Preparing a topic to publish our results. This will be used by the visualization tool rviz
     pub_moving_persons_detector = n.advertise<geometry_msgs::Point>("goal_to_reach", 1);     // Preparing a topic to publish the goal to reach.
@@ -106,7 +106,7 @@ moving_persons_detector() {
     current_robot_moving = true;
     init_laser = false;
     init_robot = false;
-    display_laser = false;sudo chmod a+rw /dev/ttyACM0
+    display_laser = false;
 
     display_robot = false;
 
@@ -201,24 +201,7 @@ void store_background() {
 
 void detect_motion() {
 
-    /** MD :
-      * Phase de détection de mouvement
-      * Permet de vérifier si un élément de l'environnement a bougé (cmp background (précédent) range (courant))
-      * Résultat stocké dans tableau "dynamic" (1000 entrées - val : 0 (statique) | 1 : mouvement détecté)
-      */
-    ROS_INFO("detecting motion");
 
-
-    for (int loop=0; loop<nb_beams; loop++ ){//loop over all the hits
-        //if the difference between ( the background and the current value ) is higher than "detection_threshold"
-        if ((background[loop]-range[loop])> detection_threshold){
-
-             dynamic[loop] = 1;//the current hit is dynamic
-        }else{
-            dynamic[loop] = 0;//else its static
-        }
-    }
-    ROS_INFO("motion detected");
 
 }//detect_motion
 
@@ -392,123 +375,8 @@ void perform_clustering() {
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 void detect_object() {
-// a moving leg is a cluster:
-// - with a size higher than "object_size_min";
-// - with a size lower than "object_size_max;
-// - more than "dynamic_threshold"% of its hits are dynamic (see, cluster_dynamic table)
 
-    ROS_INFO("detecting objects");
-    nb_object_detected = 0;
-
-    /**
-      * MD - On parcourt chaque cluster (données fournies par méthode perform_clustering)
-      * S'il correspond aux critères pour en faire une jambe i.e satisfait la taille d'une jambe
-      * et possède au moins 75% de points dynamiques
-      */
-    for (int loop=0; loop<nb_cluster; loop++){//loop over all the clusters
-        //if the size of the current cluster is higher than "object_size_min" and lower than "object_size_max" and it has "dynamic_threshold"% of its hits that are dynamic
-        //then the current cluster is a moving leg
-
-        /**
-          * MD - Si le cluster correspond à une jambe en mouvement
-          */
-        if (cluster_size[loop] > object_size_min && cluster_size[loop] < object_size_max){
-            // we update the object_detected table to store the middle of the moving leg
-            nb_object_detected++;
-            /**
-              * MD - On l'ajoute au tableau nb_object_detected
-              *      Index : Nombre de jambe
-              *      Valeur : Point moyen du cluster actuel (milieu = position jambe)
-              */
-            object_detected[nb_object_detected] =cluster_middle[loop];
-            id_object_detected[nb_object_detected]= loop;
-            //textual display
-            ROS_INFO("object detected[%i]: cluster[%i]", nb_object_detected, loop);
-            /**
-              * MD - Affichage de toutes les jambes en mouvement détectées
-              */
-            //graphical display
-            for(int loop2=cluster_start[loop]; loop2<=cluster_end[loop]; loop2++) {
-                // moving legs are white
-                display[nb_pts].x = current_scan[loop2].x;
-                display[nb_pts].y = current_scan[loop2].y;
-                display[nb_pts].z = current_scan[loop2].z;
-
-                colors[nb_pts].r = 1;
-                colors[nb_pts].g = 1;
-                colors[nb_pts].b = 1;
-                colors[nb_pts].a = 1.0;
-
-                nb_pts++;
-            }
-        }
-    }
-    if ( nb_object_detected )
-        ROS_INFO("%d objects have been detected.\n", nb_object_detected);
-
-    ROS_INFO("objects detected");
-
-}//detect_moving_legs
-
-void detect_circular_object() {
-// a moving person has two moving legs located at less than "legs_distance_max" one from the other
-
-    ROS_INFO("detecting moving persons");
-    nb_moving_persons_detected = 0;
-
-    /**
-      * MD : Pour détecter les personnes :
-      * On parcourt pour chaque jambe toutes les autres jambes en mouvement détectées (tableau object_detected
-      * de la méthode detect_moving_legs)
-      * Si deux jambes correspondent à une personne (distance < seuil)
-      * On l'ajoute au tableau moving_persons_detected
-      *
-      * IMPORTANT : la personne détectée = goal_to_reach
-      */
-    for (int loop_leg1=0; loop_leg1<nb_object_detected; loop_leg1++){//loop over all the legs
-        for (int loop_leg2=loop_leg1+1; loop_leg2<nb_object_detected; loop_leg2++){//loop over all the legs
-            //if the distance between two moving legs is lower than "legs_distance_max"
-            //then we find a moving person
-            if (distancePoints(object_detected[loop_leg1],object_detected[loop_leg2]) <legs_distance_max)
-            {
-
-                nb_moving_persons_detected++;
-                moving_persons_detected[nb_moving_persons_detected].x = (object_detected[loop_leg1].x+object_detected[loop_leg2].x)/2;
-                moving_persons_detected[nb_moving_persons_detected].y = (object_detected[loop_leg1].y+object_detected[loop_leg2].y)/2;
-            // we update the moving_persons_detected table to store the middle of the moving person
-
-            // textual display
-                ROS_INFO("moving person detected[%i]: leg[%i]+leg[%i] -> (%f, %f)", nb_moving_persons_detected, loop_leg1, loop_leg2, moving_persons_detected[nb_moving_persons_detected].x, moving_persons_detected[nb_moving_persons_detected].y);
-
-            // the moving persons are green
-                display[nb_pts].x = moving_persons_detected[nb_moving_persons_detected].x;
-                display[nb_pts].y = moving_persons_detected[nb_moving_persons_detected].y;
-                display[nb_pts].z = moving_persons_detected[nb_moving_persons_detected].z;
-
-                colors[nb_pts].r = 1;
-                colors[nb_pts].g = 1;
-                colors[nb_pts].b = 0;
-                colors[nb_pts].a = 1.0;
-
-                nb_pts++;
-
-                //update of the goal and publish of the goal
-                goal_to_reach.x = moving_persons_detected[nb_moving_persons_detected].x;
-                goal_to_reach.y = moving_persons_detected[nb_moving_persons_detected].y;
-            }
-        }
-    }
-    if ( nb_moving_persons_detected )
-        ROS_INFO("%d moving persons have been detected.\n", nb_moving_persons_detected);
-
-    ROS_INFO("moving persons detected");
-
-
-}//detect_moving_persons
-
-//CALLBACKS
-/*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+}//scanCallback
 void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan) {
 
     init_laser = true;
@@ -535,7 +403,6 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan) {
     }
 
 }//scanCallback
-
 void robot_movingCallback(const std_msgs::Bool::ConstPtr& state) {
 
     init_robot = true;
@@ -653,7 +520,7 @@ int main(int argc, char **argv){
 
     ros::init(argc, argv, "moving_persons_detector");
 
-    moving_persons_detector bsObject;
+    object_detector_node bsObject;
 
     ros::spin();
 

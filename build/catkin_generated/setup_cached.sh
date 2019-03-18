@@ -7,8 +7,9 @@
 # new environment variables
 
 # modified environment variables
-export CMAKE_PREFIX_PATH="/home/ronan/catkin_ws/devel:$CMAKE_PREFIX_PATH"
-export LD_LIBRARY_PATH="/home/ronan/catkin_ws/devel/lib:$LD_LIBRARY_PATH"
-export PWD="/home/ronan/catkin_ws/build"
-export ROSLISP_PACKAGE_DIRECTORIES="/home/ronan/catkin_ws/devel/share/common-lisp"
-export ROS_PACKAGE_PATH="/home/ronan/catkin_ws/src:$ROS_PACKAGE_PATH"
+export CMAKE_PREFIX_PATH="/home/ronan/Documents/robotic/devel:$CMAKE_PREFIX_PATH"
+export LD_LIBRARY_PATH="/home/ronan/Documents/robotic/devel/lib:$LD_LIBRARY_PATH"
+export PKG_CONFIG_PATH="/home/ronan/Documents/robotic/devel/lib/pkgconfig:$PKG_CONFIG_PATH"
+export PWD="/home/ronan/Documents/robotic/build"
+export ROSLISP_PACKAGE_DIRECTORIES="/home/ronan/Documents/robotic/devel/share/common-lisp"
+export ROS_PACKAGE_PATH="/home/ronan/catkin_ws/src:/home/ronan/Documents/robotic/src:$ROS_PACKAGE_PATH"

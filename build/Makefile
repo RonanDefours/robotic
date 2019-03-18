@@ -48,10 +48,10 @@ RM = /usr/bin/cmake -E remove -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/ronan/catkin_ws/src
+CMAKE_SOURCE_DIR = /home/ronan/Documents/robotic/src
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/ronan/catkin_ws/build
+CMAKE_BINARY_DIR = /home/ronan/Documents/robotic/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -137,9 +137,9 @@ test/fast: test
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ronan/catkin_ws/build/CMakeFiles /home/ronan/catkin_ws/build/CMakeFiles/progress.marks
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ronan/Documents/robotic/build/CMakeFiles /home/ronan/Documents/robotic/build/CMakeFiles/progress.marks
 	$(MAKE) -f CMakeFiles/Makefile2 all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ronan/catkin_ws/build/CMakeFiles 0
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/ronan/Documents/robotic/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
@@ -322,19 +322,6 @@ rotation_node: cmake_check_build_system
 rotation_node/fast:
 	$(MAKE) -f follow_me/CMakeFiles/rotation_node.dir/build.make follow_me/CMakeFiles/rotation_node.dir/build
 .PHONY : rotation_node/fast
-
-#=============================================================================
-# Target rules for targets named moving_person_detector_node
-
-# Build rule for target.
-moving_person_detector_node: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 moving_person_detector_node
-.PHONY : moving_person_detector_node
-
-# fast build rule for target.
-moving_person_detector_node/fast:
-	$(MAKE) -f follow_me/CMakeFiles/moving_person_detector_node.dir/build.make follow_me/CMakeFiles/moving_person_detector_node.dir/build
-.PHONY : moving_person_detector_node/fast
 
 #=============================================================================
 # Target rules for targets named tf2_msgs_generate_messages_nodejs
@@ -634,6 +621,19 @@ rosgraph_msgs_generate_messages_eus: cmake_check_build_system
 rosgraph_msgs_generate_messages_eus/fast:
 	$(MAKE) -f follow_me/CMakeFiles/rosgraph_msgs_generate_messages_eus.dir/build.make follow_me/CMakeFiles/rosgraph_msgs_generate_messages_eus.dir/build
 .PHONY : rosgraph_msgs_generate_messages_eus/fast
+
+#=============================================================================
+# Target rules for targets named object_detector_node
+
+# Build rule for target.
+object_detector_node: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 object_detector_node
+.PHONY : object_detector_node
+
+# fast build rule for target.
+object_detector_node/fast:
+	$(MAKE) -f follow_me/CMakeFiles/object_detector_node.dir/build.make follow_me/CMakeFiles/object_detector_node.dir/build
+.PHONY : object_detector_node/fast
 
 #=============================================================================
 # Target rules for targets named tf_generate_messages_eus
@@ -1037,7 +1037,6 @@ help:
 	@echo "... decision_node"
 	@echo "... obstacle_detection_node"
 	@echo "... rotation_node"
-	@echo "... moving_person_detector_node"
 	@echo "... tf2_msgs_generate_messages_nodejs"
 	@echo "... tf2_msgs_generate_messages_py"
 	@echo "... tf2_msgs_generate_messages_lisp"
@@ -1061,6 +1060,7 @@ help:
 	@echo "... rosgraph_msgs_generate_messages_nodejs"
 	@echo "... rosgraph_msgs_generate_messages_lisp"
 	@echo "... rosgraph_msgs_generate_messages_eus"
+	@echo "... object_detector_node"
 	@echo "... tf_generate_messages_eus"
 	@echo "... std_msgs_generate_messages_lisp"
 	@echo "... sensor_msgs_generate_messages_cpp"

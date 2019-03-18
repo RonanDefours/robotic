@@ -1,8 +1,8 @@
-# Install script for directory: /home/ronan/catkin_ws/src/follow_me
+# Install script for directory: /home/ronan/Documents/robotic/src/follow_me
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  set(CMAKE_INSTALL_PREFIX "/home/ronan/catkin_ws/install")
+  set(CMAKE_INSTALL_PREFIX "/home/ronan/Documents/robotic/install")
 endif()
 string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 
@@ -38,17 +38,17 @@ if(NOT DEFINED CMAKE_CROSSCOMPILING)
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig" TYPE FILE FILES "/home/ronan/catkin_ws/build/follow_me/catkin_generated/installspace/follow_me.pc")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/pkgconfig" TYPE FILE FILES "/home/ronan/Documents/robotic/build/follow_me/catkin_generated/installspace/follow_me.pc")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/follow_me/cmake" TYPE FILE FILES
-    "/home/ronan/catkin_ws/build/follow_me/catkin_generated/installspace/follow_meConfig.cmake"
-    "/home/ronan/catkin_ws/build/follow_me/catkin_generated/installspace/follow_meConfig-version.cmake"
+    "/home/ronan/Documents/robotic/build/follow_me/catkin_generated/installspace/follow_meConfig.cmake"
+    "/home/ronan/Documents/robotic/build/follow_me/catkin_generated/installspace/follow_meConfig-version.cmake"
     )
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/follow_me" TYPE FILE FILES "/home/ronan/catkin_ws/src/follow_me/package.xml")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/follow_me" TYPE FILE FILES "/home/ronan/Documents/robotic/src/follow_me/package.xml")
 endif()
 

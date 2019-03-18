@@ -1,0 +1,8 @@
+prefix=/home/ronan/Documents/robotic/install
+
+Name: rob_and_seek_project
+Description: Description of rob_and_seek_project
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/ronan/Documents/robotic/install/lib 
+Requires: 
