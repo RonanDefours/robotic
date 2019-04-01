@@ -49,6 +49,7 @@ private:
     float translation_to_do;
     float rotation_to_do;
     float rotation_done;
+    bool new_rotation_done;
 
     float error_integral;
     float error_previous;
@@ -125,17 +126,18 @@ void update() {
         if ( error > closest_obstacle.x )
             error = closest_obstacle.x;
 
-        bool obstacle_detected = ( fabs(closest_obstacle.x) < progressive_security_distance );
+        bool obstacle_detected = ( fabs(closest_obstacle.x) < security_distance );
 
         /**
-          * MD - On considère qu'un obstacle a été détecté lorsque l'obstacle le plus proche est inférieur
-          * à la distance de sécurité (progressive)
+          * MD - On considère qu'un obstacle a été détecté lorsque l'obstacle le plus proche est 	   * inférieur
+          * à la distance de sécurité 
           */
-        if ( obstacle_detected ){
+        if ( obstacle_detected )
             ROS_WARN("obstacle detected: (%f, %f)", closest_obstacle.x, closest_obstacle.y);
 
         cond_translation = ( fabs(error) > translation_error ) && !obstacle_detected;
         float translation_speed = 0;
+        //TODO Deplacer bloc en dessous dans le else
         /**
           * MD -Lorsque l'on rencontre un obstacle, alors le robot tourche à gauche
           */
@@ -144,7 +146,7 @@ void update() {
 
             msg_rotation_to_do.data = 90.0;
             pub_rotation_to_do.publish(msg_rotation_to_do);
-          }
+          
 
         if ( cond_translation ) {
 

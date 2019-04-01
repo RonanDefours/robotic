@@ -260,10 +260,10 @@ void perform_clustering() {
               * MD : Compte le nombre de Point dynamique (tab dynamic initialisé par méthode detect_motion)
               * Réinitialisé à chaque nouveau cluster
               */
-            if (dynamic[loop]==1)
+          /*  if (dynamic[loop]==1)
             {
                 nb_dynamic++;
-            }
+            }*/
         }
 
         /**
@@ -289,12 +289,13 @@ void perform_clustering() {
               *      Indice = n°grp cluster
               *      Valeur = % points dynamiques
               */
+              /*
             if (loop-cluster_start[nb_cluster] > 0) {
 
               cluster_dynamic[nb_cluster] = (nb_dynamic/(loop-cluster_start[nb_cluster]))*100;
             }else{
                 cluster_dynamic[nb_cluster] =0;
-            }
+            }*/
             /**
               * MD - cluster_size : Tableau où l'on stocke la distance entre le
               *      premier et le dernier point de chaque cluster
@@ -327,7 +328,7 @@ void perform_clustering() {
             nb_pts++;
 
             //textual display
-            ROS_INFO("cluster[%i]: [%i](%f, %f) -> [%i](%f, %f), size: %f, dynamic: %i", nb_cluster, cluster_start[nb_cluster], current_scan[cluster_start[nb_cluster]].x, current_scan[cluster_start[nb_cluster]].y, cluster_end[nb_cluster], current_scan[cluster_end[nb_cluster]].x, current_scan[cluster_end[nb_cluster]].y, cluster_size[nb_cluster], cluster_dynamic[nb_cluster]);
+            ROS_INFO("cluster[%i]: [%i](%f, %f) -> [%i](%f, %f), size: %f", nb_cluster, cluster_start[nb_cluster], current_scan[cluster_start[nb_cluster]].x, current_scan[cluster_start[nb_cluster]].y, cluster_end[nb_cluster], current_scan[cluster_end[nb_cluster]].x, current_scan[cluster_end[nb_cluster]].y, cluster_size[nb_cluster] );
 
             //2/ we starta new cluster with the current hit
             /**
@@ -337,8 +338,8 @@ void perform_clustering() {
             nb_cluster++;
             cluster_start[nb_cluster] = loop;
             cluster[loop] = nb_cluster;
-            if ( dynamic[loop] )
-                nb_dynamic++;
+          /*  if ( dynamic[loop] )
+                nb_dynamic++;*/
 
             //graphical display of the start of the current cluster in green
             display[nb_pts].x = current_scan[cluster_start[nb_cluster]].x;
@@ -355,13 +356,13 @@ void perform_clustering() {
 
     //Dont forget to update the different information for the last cluster
     //...
-    cluster_end[nb_cluster]=nb_beams-1;
+    cluster_end[nb_cluster]=nb_beams-1;/*
     if (nb_beams-cluster_start[nb_cluster] >0) {
 
       cluster_dynamic[nb_cluster] = (nb_dynamic/(nb_beams-cluster_start[nb_cluster]))*100;
     }else{
       cluster_dynamic[nb_cluster] =0;
-    }
+    }*/
     cluster_size[nb_cluster]=(nb_beams -1)-cluster_start[nb_cluster];
     cluster_middle[nb_cluster].x= (current_scan[cluster_start[nb_cluster]].x + current_scan[cluster_end[nb_cluster]].x)/2;
     cluster_middle[nb_cluster].y= (current_scan[cluster_start[nb_cluster]].y + current_scan[cluster_end[nb_cluster]].y)/2;
@@ -374,7 +375,97 @@ void perform_clustering() {
 // DETECTION OF MOVING PERSON
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+/*
+	fonction qui teste si le cluster est un arc de cercle
+	on teste la symetrie du cluster courant
+*/
+bool detect_circular(){
+
+	float threshold= 0.05; // accuracy
+	int cmp=0;
+  geometry_msgs::Point point_start = current_scan[cluster_start[nb_cluster]];
+  geometry_msgs::Point point_end = current_scan[cluster_end[nb_cluster]];
+  geometry_msgs::Point point_middle = cluster_middle[nb_cluster];
+  int ratio = 0;
+
+	for (int i = 0; i < cluster_size[nb_cluster]/2; ++i)
+	{
+		if( (distancePoints(point_start,point_middle) <= distancePoints(point_middle,point_end) + threshold) && (distancePoints(point_start,point_middle) >= distancePoints(point_middle,point_end) - threshold)){
+			ratio++;
+		}
+		cmp++;
+		point_start = current_scan[cluster_start[nb_cluster]+cmp];
+		point_end = current_scan[cluster_end[nb_cluster]-cmp];
+	}
+	return ((ratio/(cluster_size[nb_cluster]/2)) >= 0.95); // on teste s'il y a plus de 95% de symetrie
+
+}
+
+
+// DETECTION OF MOVING PERSON
+/*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 void detect_object() {
+	// un cylindre :
+	// - un cluster entre 20-40 cm
+	// - 2 points en partant des extrémités symétrique p/r au centre du cluster
+
+	float cylinder_size_min = 0.20;
+	float cylinder_size_max = 0.40;
+
+    ROS_INFO("detecting cylinder");
+    nb_object_detected = 0;
+
+    /**
+      * MD - On parcourt chaque cluster (données fournies par méthode perform_clustering)
+      * S'il correspond aux critères pour en faire un cylindre
+      */
+    for (int loop=0; loop<nb_cluster; loop++){//loop over all the clusters
+        //if the size of the current cluster is higher than "leg_size_min" and lower than "leg_size_max" and it has "dynamic_threshold"% of its hits that are dynamic
+        //then the current cluster is a moving leg
+
+        /**
+          * MD - Si le cluster correspond à un cylindre de 20-30 cm
+          */
+        if (cluster_size[loop] > cylinder_size_min && cluster_size[loop] < cylinder_size_max && detect_circular()){
+            // we update the cylinder_detected table to store the middle of the moving leg
+            nb_object_detected++;
+            /**
+              * MD - On l'ajoute au tableau nb_cylinder_detected
+              *      Index : Nombre de cylindre
+              *      Valeur : Point moyen du cluster actuel (milieu = centre cylindre)
+              */
+            object_detected[nb_object_detected] =cluster_middle[loop];
+            //textual display
+            ROS_INFO("cylinder detected[%i]: cluster[%i]", nb_object_detected, loop);
+            /**
+              * MD - Affichage de toutes les cylindre détectés
+              */
+            //graphical display
+            for(int loop2=cluster_start[loop]; loop2<=cluster_end[loop]; loop2++) {
+                // moving legs are white
+                display[nb_pts].x = current_scan[loop2].x;
+                display[nb_pts].y = current_scan[loop2].y;
+                display[nb_pts].z = current_scan[loop2].z;
+
+                colors[nb_pts].r = 1;
+                colors[nb_pts].g = 1;
+                colors[nb_pts].b = 1;
+                colors[nb_pts].a = 1.0;
+
+                nb_pts++;
+            }
+            //update of the goal and publish of the goal
+                goal_to_reach.x = object_detected[nb_object_detected].x;
+                goal_to_reach.y = object_detected[nb_object_detected].y;
+        }
+    }
+    if ( object_detected )
+        ROS_INFO("%d cylinder have been detected.\n", nb_object_detected);
+
+    ROS_INFO("cylinder detected");
+
 
 }//scanCallback
 void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan) {
