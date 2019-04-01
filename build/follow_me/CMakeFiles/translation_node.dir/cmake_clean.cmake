@@ -1,7 +1,7 @@
 file(REMOVE_RECURSE
   "CMakeFiles/translation_node.dir/src/translation_node.cpp.o"
-  "/home/ronan/Documents/robotic/devel/lib/follow_me/translation_node.pdb"
-  "/home/ronan/Documents/robotic/devel/lib/follow_me/translation_node"
+  "/home/ronan/catkin_ws/devel/lib/follow_me/translation_node.pdb"
+  "/home/ronan/catkin_ws/devel/lib/follow_me/translation_node"
 )
 
 # Per-language clean rules from dependency scanning.

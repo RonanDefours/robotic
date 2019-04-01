@@ -6,23 +6,23 @@
 
 #IncludeRegexTransform: 
 
-/home/ronan/Documents/robotic/src/follow_me/src/translation_node.cpp
+/home/ronan/catkin_ws/src/follow_me/src/translation_node.cpp
 ros/ros.h
-/home/ronan/Documents/robotic/src/follow_me/src/ros/ros.h
+/home/ronan/catkin_ws/src/follow_me/src/ros/ros.h
 sensor_msgs/LaserScan.h
-/home/ronan/Documents/robotic/src/follow_me/src/sensor_msgs/LaserScan.h
+/home/ronan/catkin_ws/src/follow_me/src/sensor_msgs/LaserScan.h
 visualization_msgs/Marker.h
-/home/ronan/Documents/robotic/src/follow_me/src/visualization_msgs/Marker.h
+/home/ronan/catkin_ws/src/follow_me/src/visualization_msgs/Marker.h
 geometry_msgs/Point.h
-/home/ronan/Documents/robotic/src/follow_me/src/geometry_msgs/Point.h
+/home/ronan/catkin_ws/src/follow_me/src/geometry_msgs/Point.h
 std_msgs/ColorRGBA.h
-/home/ronan/Documents/robotic/src/follow_me/src/std_msgs/ColorRGBA.h
+/home/ronan/catkin_ws/src/follow_me/src/std_msgs/ColorRGBA.h
 std_msgs/Float32.h
-/home/ronan/Documents/robotic/src/follow_me/src/std_msgs/Float32.h
+/home/ronan/catkin_ws/src/follow_me/src/std_msgs/Float32.h
 cmath
 -
 nav_msgs/Odometry.h
-/home/ronan/Documents/robotic/src/follow_me/src/nav_msgs/Odometry.h
+/home/ronan/catkin_ws/src/follow_me/src/nav_msgs/Odometry.h
 tf/transform_datatypes.h
 -
 

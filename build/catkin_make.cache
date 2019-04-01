@@ -1,2 +1,2 @@
 follow_me
--DCATKIN_DEVEL_PREFIX=/home/pc/Desktop/robotic/devel -DCMAKE_INSTALL_PREFIX=/home/pc/Desktop/robotic/install -G Unix Makefiles
+-DCATKIN_DEVEL_PREFIX=/home/ronan/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/ronan/catkin_ws/install -G Unix Makefiles
