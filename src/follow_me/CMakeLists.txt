@@ -109,7 +109,7 @@ include_directories(
 
 ## Declare a cpp executable
 add_executable(robot_moving_node src/robot_moving_node.cpp)
-add_executable(moving_person_detector_node src/moving_person_detector_node.cpp)
+add_executable(object_detector_node src/object_detector_node.cpp)
 add_executable(rotation_node src/rotation_node.cpp)
 add_executable(translation_node src/translation_node.cpp)
 add_executable(obstacle_detection_node src/obstacle_detection_node.cpp)
@@ -120,7 +120,7 @@ add_executable(decision_node src/decision_node.cpp)
 # add_dependencies(datmo_node datmo_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(moving_person_detector_node ${catkin_LIBRARIES})
+target_link_libraries(object_detector_node ${catkin_LIBRARIES})
 target_link_libraries(robot_moving_node ${catkin_LIBRARIES})
 target_link_libraries(rotation_node ${catkin_LIBRARIES})
 target_link_libraries(translation_node ${catkin_LIBRARIES})

@@ -78,7 +78,15 @@ rotation_action() {
 void update() {
 
     // we receive a new /rotation_to_do
+    /**
+      * MD - Ce programme permet d'effectuer une rotation
+      * S'effectue uniquement lorsqu'elle a été publiée (souscription à rotation to do)
+      */
     if ( new_rotation_to_do && new_odom ) {
+      /**
+        * On initialise la rotation à effectuer
+        * On n'effectue qu'une seule rotation à la fois
+        */
         new_rotation_to_do = false;
         ROS_INFO("\n(rotation_action_node) processing the /rotation_to_do received from the decision node");
         ROS_INFO("(rotation_action_node) rotation_to_do: %f", rotation_to_do*180/M_PI);
@@ -114,17 +122,31 @@ void update() {
 
         float rotation_speed = 0;
         if ( cond_rotation ) {
+          /**
+            * MD - Implémentation du PID de la rotation
+            *  P (Régulateur Proportionnel) : kp * error
+            *  I (Régulateur Intégral)      : ki * error_integral
+            *  D (Régulateur dérivé)        : kd * error_derivation;
+            *
+            */
             //TO COMPLETE
             //Implementation of a PID controller for rotation_to_do;
             //rotation_speed = kp*error + ki * error + kp * error_derivation;
 
-            float error_derivation;//To complete
-            //ROS_INFO("error_derivaion: %f", error_derivation);
+            /**
+              * MD - error_derivation = Différence entre les deux dernières erreurs
+              */
+            float error_derivation = error + error_previous;
+            ROS_INFO("error_derivaion: %f", error_derivation);
 
-            //error_integral = ...;//To complete
-            //ROS_INFO("error_integral: %f", error_integral);
+            /**
+              * MD -  error_integral = Somme des erreurs
+              */
+            error_integral += error;
+            ROS_INFO("error_integral: %f", error_integral);
 
             //control of rotation with a PID controller
+
             rotation_speed = kp * error + ki * error_integral + kd * error_derivation;
             ROS_INFO("(rotation_action_node) current_orientation: %f, orientation_to_reach: %f -> rotation_speed: %f", rotation_done*180/M_PI, rotation_to_do*180/M_PI, rotation_speed*180/M_PI);
         }

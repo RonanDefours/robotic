@@ -79,6 +79,13 @@ obstacle_detection() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 void update() {
 
+  /**
+    * MD - Ce programme permet de détecter l'obstacle le plus proche du robot,
+    * Via un scan (balayage)
+    * Publie ensuite le résultat (pub_closest_obstacle)
+    * Apparaît sous forme d'un point rouge
+    */
+
     if ( init_laser ) {
         closest_obstacle.x = range_max;
         closest_obstacle.y = range_max;
@@ -269,5 +276,3 @@ int main(int argc, char **argv){
 
     return 0;
 }
-
-
