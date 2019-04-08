@@ -382,22 +382,25 @@ void perform_clustering() {
 */
 bool detect_circular(){
 
-	float threshold= 0.05; // accuracy
+	float threshold= 0.01; // accuracy
 	int cmp=0;
   geometry_msgs::Point point_start = current_scan[cluster_start[nb_cluster]];
   geometry_msgs::Point point_end = current_scan[cluster_end[nb_cluster]];
+  geometry_msgs::Point point_median = current_scan[cluster_start[nb_cluster]+cluster_size[nb_cluster]/2];
   geometry_msgs::Point point_middle = cluster_middle[nb_cluster];
   int ratio = 0;
 
-	for (int i = 0; i < cluster_size[nb_cluster]/2; ++i)
-	{
-		if( (distancePoints(point_start,point_middle) <= distancePoints(point_middle,point_end) + threshold) && (distancePoints(point_start,point_middle) >= distancePoints(point_middle,point_end) - threshold)){
-			ratio++;
-		}
-		cmp++;
-		point_start = current_scan[cluster_start[nb_cluster]+cmp];
-		point_end = current_scan[cluster_end[nb_cluster]-cmp];
-	}
+  if(distance(point_median,point_middle)>0.03){
+  	for (int i = 0; i < cluster_size[nb_cluster]/2; ++i)
+  	{
+  		if( (distancePoints(point_start,point_middle) <= distancePoints(point_middle,point_end) + threshold) && (distancePoints(point_start,point_middle) >= distancePoints(point_middle,point_end) - threshold)){
+  			ratio++;
+  		}
+  		cmp++;
+  		point_start = current_scan[cluster_start[nb_cluster]+cmp];
+  		point_end = current_scan[cluster_end[nb_cluster]-cmp];
+  	}
+  }
 	return ((ratio/(cluster_size[nb_cluster]/2)) >= 0.95); // on teste s'il y a plus de 95% de symetrie
 
 }
@@ -610,7 +613,6 @@ void populateMarkerTopic(){
 int main(int argc, char **argv){
 
     ros::init(argc, argv, "moving_persons_detector");
-
     object_detector_node bsObject;
 
     ros::spin();
