@@ -28,11 +28,16 @@ private:
     ros::Publisher pub_translation_done;
     ros::Subscriber sub_translation_to_do;
 
+    // communication with rotation
+    ros::Publisher pub_rotation_to_do;
+    ros::Subscriber sub_rotation_done;
+
     // communication with cmd_vel to send command to the mobile robot
     ros::Publisher pub_cmd_vel;
 
     // communication with obstacle_detection
     ros::Subscriber sub_obstacle_detection;
+
 
     bool new_translation_to_do;//to check if a new /translation_to_do is available or not
     bool new_odom;//to check if new data from odometry are available
@@ -42,6 +47,9 @@ private:
     geometry_msgs::Point current_position;
 
     float translation_to_do;
+    float rotation_to_do;
+    float rotation_done;
+    bool new_rotation_done;
 
     float error_integral;
     float error_previous;
@@ -49,6 +57,7 @@ private:
     int cond_translation;
 
     geometry_msgs::Point closest_obstacle;
+
 
 public:
 
@@ -64,6 +73,10 @@ translation_action() {
     // communication with decision
     pub_translation_done = n.advertise<std_msgs::Float32>("translation_done", 1);
     sub_translation_to_do = n.subscribe("translation_to_do", 1, &translation_action::translation_to_doCallback, this);//this is the translation that has to be performed
+
+    // communication with rotation_action
+    pub_rotation_to_do = n.advertise<std_msgs::Float32>("rotation_to_do", 0);
+    sub_rotation_done = n.subscribe("rotation_done", 1, &translation_action::rotation_doneCallback, this);
 
     // communication with obstacle_detection
     sub_obstacle_detection = n.subscribe("closest_obstacle", 1, &translation_action::closest_obstacleCallback, this);
@@ -91,6 +104,7 @@ translation_action() {
 void update() {
 
     //ROS_INFO("new_odom: %i, cond_translation: %i, init_obstacle: %i", new_odom, cond_translation, init_obstacle);
+    //ROS_INFO("new_translation_to_do %i" ,new_translation_to_do);
              // we receive a new /translation_to_do
     if ( new_translation_to_do && new_odom ) {
         new_translation_to_do = false;
@@ -115,11 +129,27 @@ void update() {
 
         bool obstacle_detected = ( fabs(closest_obstacle.x) < security_distance );
 
-        if ( obstacle_detected )
+        /**
+          * MD - On considère qu'un obstacle a été détecté lorsque l'obstacle le plus proche est 	   * inférieur
+          * à la distance de sécurité 
+          */
+        float translation_speed;
+        if ( obstacle_detected ){
             ROS_WARN("obstacle detected: (%f, %f)", closest_obstacle.x, closest_obstacle.y);
 
         cond_translation = ( fabs(error) > translation_error ) && !obstacle_detected;
         float translation_speed = 0;
+        //TODO Deplacer bloc en dessous dans le else
+        /**
+          * MD -Lorsque l'on rencontre un obstacle, alors le robot tourche à gauche
+          */
+          ROS_INFO("(rotation_action_node) /rotation_to_do: %f", 4.5);
+          std_msgs::Float32 msg_rotation_to_do;
+
+            msg_rotation_to_do.data = 4.0;
+           pub_rotation_to_do.publish(msg_rotation_to_do);
+          }
+
         if ( cond_translation ) {
 
           /**
@@ -140,7 +170,7 @@ void update() {
             ROS_INFO("error_derivaion: %f", error_derivation);
 
             /**
-              * MD -  error_integral = Somme des erreurs
+              * MD - error_integral = Somme des erreurs
               */
             error_integral += error;
             ROS_INFO("error_integral: %f", error_integral);
@@ -194,8 +224,17 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& o) {
 void translation_to_doCallback(const std_msgs::Float32::ConstPtr & r) {
 // process the translation to do received from the decision node
 
+    ROS_INFO("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! translation_to_doCallback");
     new_translation_to_do = true;
     translation_to_do = r->data;
+
+}
+
+void rotation_doneCallback(const std_msgs::Float32::ConstPtr& a) {
+// process the angle received from the rotation node
+
+    new_rotation_done = true;
+    rotation_done = a->data;
 
 }
 
