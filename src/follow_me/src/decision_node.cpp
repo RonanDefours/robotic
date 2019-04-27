@@ -9,16 +9,19 @@
 #include <tf/transform_datatypes.h>
 
 /**
-  * MD - Ce programme permet de gérer l'aspect décisionnel du follow_me
-  * S'effectue sous forme d'automate à 3 états
+  * MD - Ce programme permet de gérer l'aspect décisionnel du rob_and_seek
+  * S'effectue sous forme d'automate à 3 états.
   *
-  * Etat 1 : Attente du message goal_to_reach (lorsque programme moving_persons_detector_node
-  *          Repère une personne, publie ce message)
-  * - Calcul de rotation_to_do et translation_to_do grâce aux coordonnées de la personne (x,y)
+  * Etat 1 : Attente du message goal_to_reach (lorsque programme object_detector_node
+  *          Repère l'objet, publie ce message)
+  * Si objet trouvé
+  * - Calcul de rotation_to_do et translation_to_do grâce aux coordonnées de l'objet (x,y)
   *   et aux formules fournies (coord. polaires).
   * - Publication de la rotation_to_do
   * - Entrée dans l'état 2 (attente de la fin de la rotation effectuée par programme rotation_node)
   *
+  * Sinon
+  *   On avance et tourne à gauche en cas d'obstacle
   *
   * Etat 2 :  Attente du message rotation_done (lorsque programme rotation_node
   *           a terminé la rotation, publie ce message)
@@ -108,11 +111,13 @@ void update() {
     }
 
     // we receive a new /goal_to_reach and robair is not doing a translation or a rotation
-    /**
-      * MD - Etat 1
-      */
 
-    if ( ( new_goal_to_reach ) && ( state == 1 ) ) {
+/**
+  * MD - Si on est en mode "recherche" (état 1) et que l'objet a été trouvé,
+  * alors on se dirige vers lui (comme pour le follow_me)
+  */
+
+    if ( ( new_goal_to_reach ) && ( state == 1) ) {
 
         ROS_INFO("(decision_node) /goal_to_reach received: (%f, %f)", goal_to_reach.x, goal_to_reach.y);
         new_goal_to_reach = false;
@@ -120,7 +125,7 @@ void update() {
         // we have a rotation and a translation to perform
         // we compute the /translation_to_do
         /**
-          * MD - 1.1 Calcul de la rotation/translation
+          * MD - Calcul de la rotation/translation
           */
         translation_to_do = sqrt( ( goal_to_reach.x * goal_to_reach.x ) + ( goal_to_reach.y * goal_to_reach.y ) );
 
@@ -137,7 +142,7 @@ void update() {
             std_msgs::Float32 msg_rotation_to_do;
             //to complete
             /**
-              * MD - 1.2 Publication de la rotation_to_do
+              * MD - Publication de la rotation_to_do
               */
               msg_rotation_to_do.data = rotation_to_do;
               pub_rotation_to_do.publish(msg_rotation_to_do);
@@ -178,7 +183,7 @@ void update() {
           msg_translation_to_do.data = translation_to_do;
           pub_translation_to_do.publish(msg_translation_to_do);
           /**
-            * MD - Passage dans l'état 2 (attente fin rotation)
+            * MD - Passage dans l'état 3 (attente fin rotation)
             */
           state = 3;
     }
@@ -197,22 +202,53 @@ void update() {
         ROS_INFO("(decision_node) /goal_reached (%f, %f)", msg_goal_reached.x, msg_goal_reached.y);
         //to complete
 
-        /**
-          * MD - 3.1 Publication de la destination atteinte
-          * //TODO Si ne fonctionne pas, remplacer msg_goal_reached par goal_reached
-          */
         msg_goal_reached.x = goal_reached.x;
         msg_goal_reached.y = goal_reached.y;
         pub_goal_reached.publish(msg_goal_reached);
+        new_goal_to_reach = false;
 
         /**
-          * MD - 3.2 retour à l'état initial (en attente de goal to reach)
+          * MD - Etat 1 : Recherche de l'objet
           */
 
         state = 1;
         ROS_INFO(" ");
         ROS_INFO("(decision_node) waiting for a /goal_to_reach");
     }
+
+    /**
+      * État 1
+      */
+    if (state == 1){
+      /**
+        * MD - Mode recherche de l'objet
+        * - Se déplace en ligne droite
+        * - Si obstacle, tourne à gauche
+        */
+
+
+        translation_to_do = 1.0;
+
+        ROS_INFO("(decision_node) /translation_to_do: %f", translation_to_do);
+        std_msgs::Float32 msg_translation_to_do;
+        /**
+          * MD - On déplace le robot par pas de 10
+          */
+          ROS_INFO("Etat 1, effectue translation %f", translation_to_do);
+          msg_translation_to_do.data = translation_to_do;
+          pub_translation_to_do.publish(msg_translation_to_do);
+          ROS_INFO("Dodo 10 secondes...");
+          ros::Duration(5).sleep();
+          ROS_INFO("Reveil");
+          ROS_INFO("translation terminée");
+      //    state = 4; //Déplacement du robot
+        }
+    /**  if ( state == 4 && new_translation_done){ //On attend que la translation se termine
+      //ROS_INFO("Attente fin translation");
+      ROS_INFO("translation terminée, retour à l'état 1");
+      state = 1;
+
+    }*/
 
 }// update
 
