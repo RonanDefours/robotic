@@ -1,68 +1,110 @@
-// Signal handling
-#include <signal.h>
+// moving persons detector using lidar data
+// written by O. Aycard
+
+/**
+  * MD -
+  * Résumé du programme :
+  * 1- Détection mouvements de l'environnement (comparaison avant/après)
+  * 2- Création + config des clusters (id, taille, centre, % points dynamiques, coloration, nombre..)
+  * 3- Détection des jambes (filtrage clusters qui correspondent à des jambes)
+  * 4- Détection des personnes (comparaison des jambes) + publication goal_to_reach
+  *
+  */
 
 #include "ros/ros.h"
+#include "ros/time.h"
 #include "sensor_msgs/LaserScan.h"
 #include "visualization_msgs/Marker.h"
 #include "geometry_msgs/Point.h"
 #include "std_msgs/ColorRGBA.h"
-#include "std_msgs/Float32.h"
-#include "std_msgs/Int32.h"
 #include <cmath>
-#include "nav_msgs/Odometry.h"
-#include <tf/transform_datatypes.h>
-#include <tf/transform_listener.h>
-#include "std_srvs/Empty.h"
+#include "std_msgs/Bool.h"
 
-#include "tf/transform_listener.h"
-#include "tf/transform_broadcaster.h"
-#include "message_filters/subscriber.h"
-#include "tf/message_filter.h"
+//used for clustering
+#define cluster_threshold 0.2 //threshold for clustering
 
-float robair_size = 0.25;//0.2 for small robair
+//used for detection of motion
+#define detection_threshold 0.2 //threshold for motion detection
+
+//used for detection of moving legs
+#define object_size_min 0.05
+#define object_size_max 0.25
+
+//used for detection of moving persons
+#define legs_distance_max 0.7
 
 using namespace std;
 
-class obstacle_detection {
-private:
+class object_detector_node {
 
+private:
     ros::NodeHandle n;
 
-    // communication with laser_scanner
     ros::Subscriber sub_scan;
+    ros::Subscriber sub_robot_moving;
 
-    // communication with action
-    ros::Publisher pub_closest_obstacle;
-    ros::Publisher pub_closest_obstacle_marker;
 
-    // to store, process and display both laserdata
+    ros::Publisher pub_moving_persons_detector;
+    ros::Publisher pub_moving_persons_detector_marker;
+
+    // to store, process and display laserdata
     int nb_beams;
     float range_min, range_max;
     float angle_min, angle_max, angle_inc;
     float range[1000];
     geometry_msgs::Point current_scan[1000];
-    bool init_laser;
-    geometry_msgs::Point transform_laser;
 
-    geometry_msgs::Point previous_closest_obstacle;
-    geometry_msgs::Point closest_obstacle;
+    //to perform detection of motion
+    float background[1000];//to store the background
+    //bool dynamic[1000];//to store if the current is dynamic or not
+
+    //to perform clustering
+    int nb_cluster;// number of cluster
+    int cluster[1000]; //to store for each hit, the cluster it belongs to
+    float cluster_size[1000];// to store the size of each cluster
+    geometry_msgs::Point cluster_middle[1000];// to store the middle of each cluster
+    //int cluster_dynamic[1000];// to store the percentage of the cluster that is dynamic
+    int cluster_start[1000], cluster_end[1000];
+
+    //to perform detection of object detected and to store them
+    int nb_object_detected;
+    geometry_msgs::Point object_detected[1000];// to store the middle of each object detected.
+    int id_object_detected [1000];
+
+    //to store the goal to reach that we will be published
+    geometry_msgs::Point goal_to_reach;
 
     // GRAPHICAL DISPLAY
     int nb_pts;
     geometry_msgs::Point display[2000];
     std_msgs::ColorRGBA colors[2000];
 
+    //to check if the robot is moving or not
+    bool previous_robot_moving;
+    bool current_robot_moving;
+
+    bool init_laser;//to check if new data of laser is available or not
+    bool init_robot;//to check if new data of robot_moving is available or not
+
+    bool display_laser;
+    bool display_robot;
+
 public:
 
-obstacle_detection() {
+object_detector_node() {
 
-    // Communication with laser scanner
-    sub_scan = n.subscribe("scan", 1, &obstacle_detection::scanCallback, this);
+    sub_scan = n.subscribe("scan", 1, &object_detector_node::scanCallback, this);
+    sub_robot_moving = n.subscribe("robot_moving", 1, &object_detector_node::robot_movingCallback, this);
 
-    // communication with translation_action
-    pub_closest_obstacle = n.advertise<geometry_msgs::Point>("closest_obstacle", 1);
-    pub_closest_obstacle_marker = n.advertise<visualization_msgs::Marker>("closest_obstacle_marker", 1); // Preparing a topic to publish our results. This will be used by the visualization tool rviz
+    pub_moving_persons_detector_marker = n.advertise<visualization_msgs::Marker>("moving_person_detector", 1); // Preparing a topic to publish our results. This will be used by the visualization tool rviz
+    pub_moving_persons_detector = n.advertise<geometry_msgs::Point>("goal_to_reach", 1);     // Preparing a topic to publish the goal to reach.
+
+    current_robot_moving = true;
     init_laser = false;
+    init_robot = false;
+    display_laser = false;
+
+    display_robot = false;
 
     //INFINTE LOOP TO COLLECT LASER DATA AND PROCESS THEM
     ros::Rate r(10);// this node will run at 10hz
@@ -74,66 +116,369 @@ obstacle_detection() {
 
 }
 
-//UPDATE: main processing
+//UPDATE: main processing of laser data and robot_moving
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 void update() {
 
-  /**
-    * MD - Ce programme permet de détecter l'obstacle le plus proche du robot,
-    * Via un scan (balayage)
-    * Publie ensuite le résultat (pub_closest_obstacle)
-    * Apparaît sous forme d'un point rouge
-    */
+    // we wait for new data of the laser and of the robot_moving_node to perform laser processing
+    if ( init_laser && init_robot ) {
+        nb_pts = 0;
 
-    if ( init_laser ) {
-        closest_obstacle.x = range_max;
-        closest_obstacle.y = range_max;
+        ROS_INFO("\n");
+        ROS_INFO("New data of laser received");
+        ROS_INFO("New data of robot_moving received");
 
-        float beam_angle = angle_min;
-        for ( int loop=0; loop < nb_beams; loop++, beam_angle += angle_inc ) {
-            //ROS_INFO("hit[%i]: (%f, %f) -> (%f, %f)", loop, range[loop], beam_angle*180/M_PI, current_scan[loop].x, current_scan[loop].y);
-            if ( ( fabs(current_scan[loop].y) < robair_size ) && ( fabs(closest_obstacle.x) > fabs(current_scan[loop].x) ) && ( current_scan[loop].x > 0 ) )
-                closest_obstacle = current_scan[loop];
+        nb_pts = 0;
+        //if the robot is not moving then we can perform moving persons detection
+        if ( !current_robot_moving ) {
+
+            ROS_INFO("robot is not moving");
+                // if the robot was moving previously and now it is not moving now then we store the background
+            if ( previous_robot_moving && !current_robot_moving )
+                store_background();
+
+            //we search for moving persons in 4 steps
+            //detect_motion();//to classify each hit of the laser as dynamic or not
+            perform_clustering();//to perform clustering
+            detect_object();//to detect objects using cluster
+            //detect_moving_persons();//to detect moving_persons using moving legs detected
+
+            //graphical display of the results
+            populateMarkerTopic();
+
+            //to publish the goal_to_reach
+            if ( nb_object_detected )
+                pub_moving_persons_detector.publish(goal_to_reach);
         }
-
-        pub_closest_obstacle.publish(closest_obstacle);
-
-        nb_pts=0;
-        // closest obstacle is red
-        display[nb_pts] = closest_obstacle;
-
-        colors[nb_pts].r = 1;
-        colors[nb_pts].g = 0;
-        colors[nb_pts].b = 0;
-        colors[nb_pts].a = 1.0;
-        nb_pts++;
-        populateMarkerTopic();
-
-        if ( distancePoints(closest_obstacle, previous_closest_obstacle) > 0.05 ) {
-            ROS_INFO("closest obstacle: (%f; %f)", closest_obstacle.x, closest_obstacle.y);
-
-            previous_closest_obstacle.x = closest_obstacle.x;
-            previous_closest_obstacle.y = closest_obstacle.y;
+        else
+            ROS_INFO("robot is moving");
+    }
+    else {
+        if ( !display_laser && !init_laser ) {
+            ROS_INFO("wait for laser data");
+            display_laser = true;
+        }
+        if ( display_laser && init_laser )  {
+            ROS_INFO("laser data are ok");
+            display_laser = false;
+        }
+        if ( !display_robot && !init_robot ) {
+            ROS_INFO("wait for robot_moving_node");
+            display_robot = true;
+        }
+        if ( display_robot && init_robot ) {
+            ROS_INFO("robot_moving_node is ok");
+            display_robot = true;
         }
     }
 
-}
+}// update
 
-// Distance between two points
-float distancePoints(geometry_msgs::Point pa, geometry_msgs::Point pb) {
-
-    return sqrt(pow((pa.x-pb.x),2.0) + pow((pa.y-pb.y),2.0));
-
-}
-
-//CALLBACK
+// DETECTION OF MOTION
 /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+void store_background() {
+
+  /**
+    * MD : Permet de stocker le balayage laser précédent
+    * Nécessaire pour comparer s'il y a un mouvement au prochain balayage laser
+    */
+// store all the hits of the laser in the background table
+
+    ROS_INFO("storing background");
+
+    for (int loop=0; loop<nb_beams; loop++)
+        background[loop] = range[loop];
+
+    ROS_INFO("background stored");
+
+}//init_background
+
+void detect_motion() {
+
+
+
+}//detect_motion
+
+// CLUSTERING
+/*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+void perform_clustering() {
+  /**
+    * MD : Permet de constituer les groupes de points (cluster)
+    * Premier point cluster : vert (initialisation)
+    * Dernier point cluster : rouge (lorsque seuil dépassé)
+    */
+//store in the table cluster, the cluster of each hit of the laser
+//if the distance between the previous hit and the current one is lower than "cluster_threshold"
+//then the current hit belongs to the current cluster
+//else we start a new cluster with the current hit and end the current cluster
+
+    ROS_INFO("performing clustering");
+
+    nb_cluster = 0;//to count the number of cluster
+
+    //initialization of the first cluster
+    cluster_start[0] = 0;// the first hit is the start of the first cluster
+    cluster[0] = 0;// the first hit belongs to the first cluster
+    int nb_dynamic = 0;// to count the number of hits of the current cluster that are dynamic
+
+    //graphical display of the start of the current cluster in green
+
+    /**
+      * MD : Point vert = début du cluster
+      */
+    display[nb_pts].x = current_scan[cluster_start[nb_cluster]].x;
+    display[nb_pts].y = current_scan[cluster_start[nb_cluster]].y;
+    display[nb_pts].z = current_scan[cluster_start[nb_cluster]].z;
+
+    colors[nb_pts].r = 0;
+    colors[nb_pts].g = 1;
+    colors[nb_pts].b = 0;
+    colors[nb_pts].a = 1.0;
+    nb_pts++;
+
+    /**
+      * MD : Permet de stocker les groupes de cluster
+      * Ex : cluster[0] = 0 ; cluster[1] = 0 ; cluster[2] = 0 ; cluster[3] = 1
+      * Il a le cluster 0 (resp 1) qui contient 3 points (resp 1 point)
+      */
+    for( int loop=1; loop<nb_beams; loop++ )//loop over all the hits
+        //if distance between (the previous hit and the current one) is lower than "cluster_threshold"
+
+        /**
+          * MD - Point supplémentaire pour ce cluster
+          */
+        if (distancePoints(current_scan[loop-1],current_scan[loop])< cluster_threshold){
+            cluster[loop]=nb_cluster;   //the current hit belongs to the current cluster
+            /**
+              * MD : Compte le nombre de Point dynamique (tab dynamic initialisé par méthode detect_motion)
+              * Réinitialisé à chaque nouveau cluster
+              */
+          /*  if (dynamic[loop]==1)
+            {
+                nb_dynamic++;
+            }*/
+        }
+
+        /**
+          * MD - Seuil dépassé, on termine donc le cluster précédent et on
+          * en créé un nouveau à partir du point actuel
+          */
+        else {//the current hit doesnt belong to the same hit
+              /*1/ we end the current cluster, so we update:
+              - cluster-end to store the last hit of the current cluster
+              - cluster_dynamic to store the percentage of hits of the current cluster that are dynamic
+              - cluster_size to store the size of the cluster ie, the distance between the first hit of the cluster and the last one
+              - cluster_middle to store the middle of the cluster*/
+
+          /**
+            * MD - cluster_end : Tableau où l'on stocke le dernier point de chaque cluster
+            *       Indice = n°grp cluster
+            *      Valeur = n°dernier point
+            */
+            cluster_end[nb_cluster]=loop-1;
+            /**
+              * MD - cluster_dynamic : Tableau où l'on stocke le % de points dynamiques de chaque
+              *      cluster
+              *      Indice = n°grp cluster
+              *      Valeur = % points dynamiques
+              */
+              /*
+            if (loop-cluster_start[nb_cluster] > 0) {
+
+              cluster_dynamic[nb_cluster] = (nb_dynamic/(loop-cluster_start[nb_cluster]))*100;
+            }else{
+                cluster_dynamic[nb_cluster] =0;
+            }*/
+            /**
+              * MD - cluster_size : Tableau où l'on stocke la distance entre le
+              *      premier et le dernier point de chaque cluster
+              *      Indice = n°grp cluster
+              *      Valeur = distance entre les extrémités du cluster
+              */
+            cluster_size[nb_cluster]=distancePoints(current_scan[cluster_end[nb_cluster]],current_scan[cluster_start[nb_cluster]]);
+
+            /**
+              * MD - cluster_middle : Tableau où l'on stocke la coordonnée x et y
+              *      moyenne du cluster
+              *      Indice = n°grp cluster
+              *      Valeur = Point au centre du cluster
+              */
+            cluster_middle[nb_cluster].x= (current_scan[cluster_start[nb_cluster]].x + current_scan[cluster_end[nb_cluster]].x)/2;
+            cluster_middle[nb_cluster].y= (current_scan[cluster_start[nb_cluster]].y + current_scan[cluster_end[nb_cluster]].y)/2;
+
+            //graphical display of the end of the current cluster in red
+            /**
+              * MD : Point rouge = fin du cluster
+              */
+            display[nb_pts].x = current_scan[cluster_end[nb_cluster]].x;
+            display[nb_pts].y = current_scan[cluster_end[nb_cluster]].y;
+            display[nb_pts].z = current_scan[cluster_end[nb_cluster]].z;
+
+            colors[nb_pts].r = 1;
+            colors[nb_pts].g = 0;
+            colors[nb_pts].b = 0;
+            colors[nb_pts].a = 1.0;
+            nb_pts++;
+
+            //textual display
+            ROS_INFO("cluster[%i]: [%i](%f, %f) -> [%i](%f, %f), size: %f", nb_cluster, cluster_start[nb_cluster], current_scan[cluster_start[nb_cluster]].x, current_scan[cluster_start[nb_cluster]].y, cluster_end[nb_cluster], current_scan[cluster_end[nb_cluster]].x, current_scan[cluster_end[nb_cluster]].y, cluster_size[nb_cluster] );
+
+            //2/ we starta new cluster with the current hit
+            /**
+              * MD - Début du nouveau cluster (similaire à init premier cluster cf début méthode)
+              */
+            nb_dynamic = 0;// to count the number of hits of the current cluster that are dynamic
+            nb_cluster++;
+            cluster_start[nb_cluster] = loop;
+            cluster[loop] = nb_cluster;
+          /*  if ( dynamic[loop] )
+                nb_dynamic++;*/
+
+            //graphical display of the start of the current cluster in green
+            display[nb_pts].x = current_scan[cluster_start[nb_cluster]].x;
+            display[nb_pts].y = current_scan[cluster_start[nb_cluster]].y;
+            display[nb_pts].z = current_scan[cluster_start[nb_cluster]].z;
+
+            colors[nb_pts].r = 0;
+            colors[nb_pts].g = 1;
+            colors[nb_pts].b = 0;
+            colors[nb_pts].a = 1.0;
+            nb_pts++;
+
+        }
+
+    //Dont forget to update the different information for the last cluster
+    //...
+    cluster_end[nb_cluster]=nb_beams-1;/*
+    if (nb_beams-cluster_start[nb_cluster] >0) {
+
+      cluster_dynamic[nb_cluster] = (nb_dynamic/(nb_beams-cluster_start[nb_cluster]))*100;
+    }else{
+      cluster_dynamic[nb_cluster] =0;
+    }*/
+    cluster_size[nb_cluster]=(nb_beams -1)-cluster_start[nb_cluster];
+    cluster_middle[nb_cluster].x= (current_scan[cluster_start[nb_cluster]].x + current_scan[cluster_end[nb_cluster]].x)/2;
+    cluster_middle[nb_cluster].y= (current_scan[cluster_start[nb_cluster]].y + current_scan[cluster_end[nb_cluster]].y)/2;
+    nb_cluster++;
+
+    ROS_INFO("clustering performed");
+
+}//perfor_clustering
+
+// DETECTION OF MOVING PERSON
+/*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+/*
+	fonction qui teste si le cluster est un arc de cercle
+	on teste la symetrie du cluster courant
+*/
+bool detect_circular(int current_cluster){
+
+	float threshold= 0.01; // accuracy
+	int cmp=0;
+  geometry_msgs::Point point_start = current_scan[cluster_start[current_cluster]];
+  geometry_msgs::Point point_end = current_scan[cluster_end[current_cluster]];
+  geometry_msgs::Point point_median = current_scan[cluster_start[current_cluster+(int)(cluster_size[current_cluster]/2)]];
+  geometry_msgs::Point point_middle = cluster_middle[current_cluster];
+  int ratio = 0;
+
+  if(distancePoints(point_median,point_middle)>(0.6*distancePoints(point_middle,point_start)) && distancePoints(point_middle,point_start)>=distancePoints(point_middle, point_median)){
+  	for (int i = 0; i < cluster_size[current_cluster]/2; ++i)
+  	{
+  		if( (distancePoints(point_start,point_middle) <= distancePoints(point_middle,point_end) + threshold) && (distancePoints(point_start,point_middle) >= distancePoints(point_middle,point_end) - threshold)){
+  			ratio++;
+  		}
+  		cmp++;
+  		point_start = current_scan[cluster_start[current_cluster]+cmp];
+  		point_end = current_scan[cluster_end[current_cluster]-cmp];
+  	}
+  }
+	return ((ratio/(cluster_size[current_cluster]/2)) >= 0.95); // on teste s'il y a plus de 95% de symetrie
+
+}
+
+
+// DETECTION OF MOVING PERSON
+/*//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+void detect_object() {
+	// un cylindre :
+	// - un cluster entre 20-40 cm
+	// - 2 points en partant des extrémités symétrique p/r au centre du cluster
+
+	float cylinder_size_min = 0.20;
+	float cylinder_size_max = 0.40;
+
+    ROS_INFO("detecting cylinder");
+    nb_object_detected = 0;
+
+    /**
+      * MD - On parcourt chaque cluster (données fournies par méthode perform_clustering)
+      * S'il correspond aux critères pour en faire un cylindre
+      */
+    for (int loop=0; loop<nb_cluster; loop++){//loop over all the clusters
+        //if the size of the current cluster is higher than "leg_size_min" and lower than "leg_size_max" and it has "dynamic_threshold"% of its hits that are dynamic
+        //then the current cluster is a moving leg
+
+        /**
+          * MD - Si le cluster correspond à un cylindre de 20-30 cm
+          */
+        if (cluster_size[loop] > cylinder_size_min && cluster_size[loop] < cylinder_size_max && detect_circular(loop)){
+            // we update the cylinder_detected table to store the middle of the moving leg
+            nb_object_detected++;
+            /**
+              * MD - On l'ajoute au tableau nb_cylinder_detected
+              *      Index : Nombre de cylindre
+              *      Valeur : Point moyen du cluster actuel (milieu = centre cylindre)
+              */
+            object_detected[nb_object_detected] =cluster_middle[loop];
+            //textual display
+            ROS_INFO("cylinder detected[%i]: cluster[%i]", nb_object_detected, loop);
+            /**
+              * MD - Affichage de toutes les cylindre détectés
+              */
+            //graphical display
+            for(int loop2=cluster_start[loop]; loop2<=cluster_end[loop]; loop2++) {
+                // moving legs are white
+                display[nb_pts].x = current_scan[loop2].x;
+                display[nb_pts].y = current_scan[loop2].y;
+                display[nb_pts].z = current_scan[loop2].z;
+
+                colors[nb_pts].r = 1;
+                colors[nb_pts].g = 1;
+                colors[nb_pts].b = 1;
+                colors[nb_pts].a = 1.0;
+
+                nb_pts++;
+            }
+            //update of the goal and publish of the goal
+                display[nb_pts].x = cluster_middle[loop].x;
+                display[nb_pts].y = cluster_middle[loop].y;
+                display[nb_pts].z = cluster_middle[loop].z;
+
+                colors[nb_pts].r = 1;
+                colors[nb_pts].g = 1;
+                colors[nb_pts].b = 0;
+                colors[nb_pts].a = 1.0;
+                nb_pts++;
+                goal_to_reach.x = object_detected[nb_object_detected].x;
+                goal_to_reach.y = object_detected[nb_object_detected].y;
+        }
+    }
+    if ( object_detected )
+        ROS_INFO("%d cylinder have been detected.\n", nb_object_detected);
+
+    ROS_INFO("cylinder detected");
+
+
+}//scanCallback
 void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan) {
 
     init_laser = true;
-
     // store the important data related to laserscanner
     range_min = scan->range_min;
     range_max = scan->range_max;
@@ -150,15 +495,28 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan) {
         else
             range[loop] = range_max;
 
-        //transform the scan in cartesian framewrok
+        //transform the scan in cartesian framework
         current_scan[loop].x = range[loop] * cos(beam_angle);
         current_scan[loop].y = range[loop] * sin(beam_angle);
         current_scan[loop].z = 0.0;
-        //ROS_INFO("laser[%i]: (%f, %f) -> (%f, %f)", loop, range[loop], beam_angle*180/M_PI, current_scan[loop].x, current_scan[loop].y);
-
     }
 
 }//scanCallback
+
+void robot_movingCallback(const std_msgs::Bool::ConstPtr& state) {
+
+    init_robot = true;
+    previous_robot_moving = current_robot_moving;
+    current_robot_moving = state->data;
+
+}//robot_movingCallback
+
+// Distance between two points
+float distancePoints(geometry_msgs::Point pa, geometry_msgs::Point pb) {
+
+    return sqrt(pow((pa.x-pb.x),2.0) + pow((pa.y-pb.y),2.0));
+
+}
 
 // Draw the field of view and other references
 void populateMarkerReference() {
@@ -210,7 +568,7 @@ void populateMarkerReference() {
     v.z = 0.0;
     references.points.push_back(v);
 
-    pub_closest_obstacle_marker.publish(references);
+    pub_moving_persons_detector_marker.publish(references);
 
 }
 
@@ -251,26 +609,17 @@ void populateMarkerTopic(){
             marker.colors.push_back(c);
         }
 
-    pub_closest_obstacle_marker.publish(marker);
+    pub_moving_persons_detector_marker.publish(marker);
     populateMarkerReference();
 
 }
 
-
 };
-
 
 int main(int argc, char **argv){
 
-    ros::init(argc, argv, "obstacle_detection");
-    ros::NodeHandle n;
-
-    ROS_INFO("(obstacle_detection) PARAMETERS");
-
-    ros::param::get("/obstacle_detection_node/robot_size", robair_size);
-    ROS_INFO("(obstacle_detection) robot_size: %f", robair_size);
-
-    obstacle_detection bsObject;
+    ros::init(argc, argv, "moving_persons_detector");
+    object_detector_node bsObject;
 
     ros::spin();
 
