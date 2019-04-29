@@ -1,4 +1,4 @@
-#include "ros/ros.h"
+ #include "ros/ros.h"
 #include <geometry_msgs/Twist.h>
 #include "geometry_msgs/Point.h"
 #include "geometry_msgs/Quaternion.h"
@@ -241,6 +241,11 @@ void update() {
           ros::Duration(5).sleep();
           ROS_INFO("Reveil");
           ROS_INFO("translation terminée");
+          /**
+            * MD -Lorsque l'on rencontre un obstacle, alors le robot tourche à gauche
+            * Pour cela, on regarde si le robot a bougé ou s'il fait face à un obstacle
+            */
+
       //    state = 4; //Déplacement du robot
         }
     /**  if ( state == 4 && new_translation_done){ //On attend que la translation se termine

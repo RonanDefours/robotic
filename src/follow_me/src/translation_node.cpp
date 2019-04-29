@@ -28,10 +28,6 @@ private:
     ros::Publisher pub_translation_done;
     ros::Subscriber sub_translation_to_do;
 
-    // communication with rotation
-    ros::Publisher pub_rotation_to_do;
-    ros::Subscriber sub_rotation_done;
-
     // communication with cmd_vel to send command to the mobile robot
     ros::Publisher pub_cmd_vel;
 
@@ -47,9 +43,6 @@ private:
     geometry_msgs::Point current_position;
 
     float translation_to_do;
-    float rotation_to_do;
-    float rotation_done;
-    bool new_rotation_done;
 
     float error_integral;
     float error_previous;
@@ -73,10 +66,6 @@ translation_action() {
     // communication with decision
     pub_translation_done = n.advertise<std_msgs::Float32>("translation_done", 1);
     sub_translation_to_do = n.subscribe("translation_to_do", 1, &translation_action::translation_to_doCallback, this);//this is the translation that has to be performed
-
-    // communication with rotation_action
-    pub_rotation_to_do = n.advertise<std_msgs::Float32>("rotation_to_do", 0);
-    sub_rotation_done = n.subscribe("rotation_done", 1, &translation_action::rotation_doneCallback, this);
 
     // communication with obstacle_detection
     sub_obstacle_detection = n.subscribe("closest_obstacle", 1, &translation_action::closest_obstacleCallback, this);
@@ -131,24 +120,14 @@ void update() {
 
         /**
           * MD - On considère qu'un obstacle a été détecté lorsque l'obstacle le plus proche est 	   * inférieur
-          * à la distance de sécurité 
+          * à la distance de sécurité
           */
         float translation_speed;
-        if ( obstacle_detected ){
+        if ( obstacle_detected )
             ROS_WARN("obstacle detected: (%f, %f)", closest_obstacle.x, closest_obstacle.y);
 
         cond_translation = ( fabs(error) > translation_error ) && !obstacle_detected;
         float translation_speed = 0;
-        //TODO Deplacer bloc en dessous dans le else
-        /**
-          * MD -Lorsque l'on rencontre un obstacle, alors le robot tourche à gauche
-          */
-          ROS_INFO("(rotation_action_node) /rotation_to_do: %f", 4.5);
-          std_msgs::Float32 msg_rotation_to_do;
-
-            msg_rotation_to_do.data = 4.0;
-           pub_rotation_to_do.publish(msg_rotation_to_do);
-          }
 
         if ( cond_translation ) {
 
@@ -227,14 +206,6 @@ void translation_to_doCallback(const std_msgs::Float32::ConstPtr & r) {
     ROS_INFO("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! translation_to_doCallback");
     new_translation_to_do = true;
     translation_to_do = r->data;
-
-}
-
-void rotation_doneCallback(const std_msgs::Float32::ConstPtr& a) {
-// process the angle received from the rotation node
-
-    new_rotation_done = true;
-    rotation_done = a->data;
 
 }
 
