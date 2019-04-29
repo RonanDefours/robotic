@@ -62,6 +62,12 @@ private:
     bool new_rotation_done;//to check if a new /rotation_done is available or not
     bool new_translation_done;//to check if a new /translation_done is available or not
 
+    /**
+      * MD - Ces deux points permettent d'évaluer en mode recherche s'il faut effectuer une rotation (obstacle rencontré)
+      */
+    geometry_msgs::Point start_position;
+    geometry_msgs::Point current_position;
+
     geometry_msgs::Point goal_to_reach;
     geometry_msgs::Point goal_reached;
 
@@ -83,6 +89,8 @@ decision() {
     // communication with translation_action
     pub_translation_to_do = n.advertise<std_msgs::Float32>("translation_to_do", 0);
     sub_translation_done = n.subscribe("translation_done", 1, &decision::translation_doneCallback, this);
+
+    sub_odometry = n.subscribe("odom", 1, &decision::odomCallback, this);
 
     state = 1;
     display_state = false;
@@ -226,25 +234,46 @@ void update() {
         * - Si obstacle, tourne à gauche
         */
 
+        start_position.x = current_position.x;
+        start_position.y = current_position.y;
 
-        translation_to_do = 1.0;
-
-        ROS_INFO("(decision_node) /translation_to_do: %f", translation_to_do);
-        std_msgs::Float32 msg_translation_to_do;
         /**
-          * MD - On déplace le robot par pas de 10
+          * MD - On déplace le robot par pas de 1
           */
+
+          translation_to_do = 1.0;
+          std_msgs::Float32 msg_translation_to_do;
           ROS_INFO("Etat 1, effectue translation %f", translation_to_do);
           msg_translation_to_do.data = translation_to_do;
           pub_translation_to_do.publish(msg_translation_to_do);
-          ROS_INFO("Dodo 10 secondes...");
-          ros::Duration(5).sleep();
+          ROS_INFO("Dodo 7 secondes...");
+          ros::Duration(7).sleep();
           ROS_INFO("Reveil");
           ROS_INFO("translation terminée");
+
           /**
             * MD -Lorsque l'on rencontre un obstacle, alors le robot tourche à gauche
             * Pour cela, on regarde si le robot a bougé ou s'il fait face à un obstacle
             */
+            float distance_parcourue = distancePoints(start_position, current_position);
+            if (distance_parcourue < 0.2){
+              //TODO A SUPPRIMER (sert juste à vérifier passage dans condition)
+              ROS_INFO("OBSTACLE RENCONTRE");
+              // Effectue rotation à 90 degrés (idéalement)
+              rotation_to_do = M_PI/2;
+              ROS_INFO("(decision_node) /rotation_to_do: %f", rotation_to_do);
+              /**
+                * MD - Publication de la rotation_to_do
+                */
+                std_msgs::Float32 msg_rotation_to_do;
+                msg_rotation_to_do.data = rotation_to_do;
+                pub_rotation_to_do.publish(msg_rotation_to_do);
+                ROS_INFO("Dodo 7 secondes...");
+                ros::Duration(7).sleep();
+                ROS_INFO("Reveil");
+                ROS_INFO("rotation terminée");
+            }
+
 
       //    state = 4; //Déplacement du robot
         }
@@ -283,6 +312,15 @@ void translation_doneCallback(const std_msgs::Float32::ConstPtr& r) {
     new_translation_done = true;
     translation_done = r->data;
 
+}
+
+//Pour vérifier si le robot s'est suffisamment déplacé lors de la recherche
+void odomCallback(const nav_msgs::Odometry::ConstPtr& o) {
+    //TODO A SUPPRIMER (sert juste à vérifier passage dans fonction + tester fréquence publication de l'odometre)
+    ROS_INFO("PASSAGE ODOMCALLBACK DECISION NODE");
+    current_position.x = o->pose.pose.position.x;
+    current_position.y = o->pose.pose.position.y;
+    current_position.z = o->pose.pose.position.z;
 }
 
 // Distance between two points

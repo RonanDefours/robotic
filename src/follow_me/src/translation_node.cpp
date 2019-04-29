@@ -119,10 +119,9 @@ void update() {
         bool obstacle_detected = ( fabs(closest_obstacle.x) < security_distance );
 
         /**
-          * MD - On considère qu'un obstacle a été détecté lorsque l'obstacle le plus proche est 	   * inférieur
+          * MD - On considère qu'un obstacle a été détecté lorsque l'obstacle le plus proche est inférieur
           * à la distance de sécurité
           */
-        float translation_speed;
         if ( obstacle_detected )
             ROS_WARN("obstacle detected: (%f, %f)", closest_obstacle.x, closest_obstacle.y);
 
