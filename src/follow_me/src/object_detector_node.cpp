@@ -26,9 +26,7 @@
 //used for detection of motion
 #define detection_threshold 0.2 //threshold for motion detection
 
-//used for detection of moving legs
-#define object_size_min 0.05
-#define object_size_max 0.25
+
 
 //used for detection of moving persons
 #define legs_distance_max 0.7
@@ -395,7 +393,10 @@ bool detect_circular(int current_cluster){
   		cmp++;
   		point_start = current_scan[cluster_start[current_cluster]+cmp];
   		point_end = current_scan[cluster_end[current_cluster]-cmp];
+
   	}
+  }else{
+  	return false;
   }
 	return ((ratio/(cluster_size[current_cluster]/2)) >= 0.95); // on teste s'il y a plus de 95% de symetrie
 
@@ -410,8 +411,8 @@ void detect_object() {
 	// - un cluster entre 20-40 cm
 	// - 2 points en partant des extrémités symétrique p/r au centre du cluster
 
-	float cylinder_size_min = 0.20;
-	float cylinder_size_max = 0.40;
+	float cylinder_size_min = 0.15;
+	float cylinder_size_max = 0.30;
 
     ROS_INFO("detecting cylinder");
     nb_object_detected = 0;
@@ -427,7 +428,7 @@ void detect_object() {
         /**
           * MD - Si le cluster correspond à un cylindre de 20-30 cm
           */
-        if (cluster_size[loop] > cylinder_size_min && cluster_size[loop] < cylinder_size_max && detect_circular(loop)){
+        if (cluster_size[loop] > cylinder_size_min && cluster_size[loop] <= cylinder_size_max && detect_circular(loop)){
             // we update the cylinder_detected table to store the middle of the moving leg
             nb_object_detected++;
             /**
